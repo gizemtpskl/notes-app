@@ -1,0 +1,160 @@
+/*
+ * theme.css: design tokens. All colors are defined here, once for light and once for dark.
+ * Everything else refers to these variables.
+ * Contrast: --text and --text-muted meet WCAG AA on both --bg and --bg-sidebar in both themes.
+ * --chart-line is validated for data marks (lightness, chroma, contrast) against each theme's --bg.
+ */
+:root {
+  color-scheme: light;
+
+  --bg: #fbfaf7;
+  --bg-sidebar: #f3f1eb;
+  --bg-raised: #ffffff;
+  --bg-hover: rgba(60, 52, 36, 0.06);
+  --bg-active: rgba(60, 52, 36, 0.1);
+  --bg-code: #f1efe8;
+  --border: #e4e0d6;
+  --border-strong: #cfcabb;
+
+  --text: #25231f;
+  --text-muted: #625e55;
+  --text-faint: #6f6b61;
+
+  --accent: #2c6a5e;
+  --accent-hover: #235549;
+  --accent-text: #ffffff;
+  --accent-soft: #e3efea;
+  --accent-ink: #1f5a4e;
+
+  --danger: #a93a2c;
+  --danger-hover: #8d2e22;
+  --danger-soft: #f8e7e3;
+  --warning-soft: #f7efd9;
+  --warning-border: #e3d4a5;
+
+  --chart-line: #0f8a72;
+
+  --c-sage: #5d8a5e;
+  --c-sky: #3f7fae;
+  --c-plum: #8a5a9a;
+  --c-rose: #b95a78;
+  --c-amber: #b07d1f;
+  --c-clay: #b4663f;
+  --c-teal: #2f8a86;
+  --c-slate: #68717d;
+
+  --shadow-sm: 0 1px 2px rgba(40, 34, 20, 0.08);
+  --shadow-md: 0 8px 28px rgba(40, 34, 20, 0.16), 0 1px 3px rgba(40, 34, 20, 0.08);
+  --scrim: rgba(35, 32, 25, 0.38);
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-read: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, "Noto Serif", serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 14px;
+  --sidebar-width: 272px;
+  --content-width: 760px;
+  --gutter: 16px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #1b1c1a;
+  --bg-sidebar: #161715;
+  --bg-raised: #262724;
+  --bg-hover: rgba(240, 235, 220, 0.07);
+  --bg-active: rgba(240, 235, 220, 0.12);
+  --bg-code: #2a2b28;
+  --border: #33342f;
+  --border-strong: #494a43;
+
+  --text: #e9e6dd;
+  --text-muted: #aeaa9e;
+  --text-faint: #a09c90;
+
+  --accent: #6fb8a5;
+  --accent-hover: #85c8b6;
+  --accent-text: #10201c;
+  --accent-soft: #24352f;
+  --accent-ink: #8fd0be;
+
+  --danger: #e58a7b;
+  --danger-hover: #efa294;
+  --danger-soft: #3b2622;
+  --warning-soft: #352e1d;
+  --warning-border: #5c4f2c;
+
+  --chart-line: #2fa88c;
+
+  --c-sage: #8fbc8f;
+  --c-sky: #7fb4dc;
+  --c-plum: #c29ad0;
+  --c-rose: #e08ea9;
+  --c-amber: #dcb163;
+  --c-clay: #dd9a78;
+  --c-teal: #6cc4bf;
+  --c-slate: #a3acb8;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --scrim: rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #1b1c1a;
+    --bg-sidebar: #161715;
+    --bg-raised: #262724;
+    --bg-hover: rgba(240, 235, 220, 0.07);
+    --bg-active: rgba(240, 235, 220, 0.12);
+    --bg-code: #2a2b28;
+    --border: #33342f;
+    --border-strong: #494a43;
+
+    --text: #e9e6dd;
+    --text-muted: #aeaa9e;
+    --text-faint: #a09c90;
+
+    --accent: #6fb8a5;
+    --accent-hover: #85c8b6;
+    --accent-text: #10201c;
+    --accent-soft: #24352f;
+    --accent-ink: #8fd0be;
+
+    --danger: #e58a7b;
+    --danger-hover: #efa294;
+    --danger-soft: #3b2622;
+    --warning-soft: #352e1d;
+    --warning-border: #5c4f2c;
+
+    --chart-line: #2fa88c;
+
+    --c-sage: #8fbc8f;
+    --c-sky: #7fb4dc;
+    --c-plum: #c29ad0;
+    --c-rose: #e08ea9;
+    --c-amber: #dcb163;
+    --c-clay: #dd9a78;
+    --c-teal: #6cc4bf;
+    --c-slate: #a3acb8;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --scrim: rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* A space's color is available as --space anywhere inside an element tagged with it. */
+[data-color="sage"] { --space: var(--c-sage); }
+[data-color="sky"] { --space: var(--c-sky); }
+[data-color="plum"] { --space: var(--c-plum); }
+[data-color="rose"] { --space: var(--c-rose); }
+[data-color="amber"] { --space: var(--c-amber); }
+[data-color="clay"] { --space: var(--c-clay); }
+[data-color="teal"] { --space: var(--c-teal); }
+[data-color="slate"] { --space: var(--c-slate); }

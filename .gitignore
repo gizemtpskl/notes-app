@@ -1,0 +1,2 @@
+# Files the Mac makes on its own. The app doesn't need them.
+.DS_Store

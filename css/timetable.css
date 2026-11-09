@@ -1,0 +1,221 @@
+/* timetable.css: the weekly timetable, its block editor, and the dashboard's schedule card. */
+
+.page-wide { max-width: 1180px; }
+.btn-quiet { border-color: transparent; background: none; }
+
+/* -- Toolbar -------------------------------------------------------------------------- */
+.tt-quick { min-height: 44px; margin-bottom: 12px; padding: 2px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-raised); }
+.tt-quick:focus-within { border-color: var(--accent); }
+.tt-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 10px; }
+.tt-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.tt-jump { width: auto; margin-left: 6px; }
+.tt-summary { margin-bottom: 8px; color: var(--text-muted); font-size: 13px; }
+.tt-hint { margin-top: 10px; }
+
+/* -- Grid ----------------------------------------------------------------------------- */
+.tt-scroll { max-height: min(72vh, 900px); overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
+.tt-grid { --label: 52px; min-width: 100%; }
+.tt-days-7 { min-width: 680px; }
+.tt-scroll.is-day { touch-action: pan-y; }
+.tt-head, .tt-main { display: grid; grid-template-columns: var(--label) repeat(var(--days, 7), minmax(0, 1fr)); }
+.tt-days-1 .tt-head, .tt-days-1 .tt-main { --days: 1; }
+.tt-head { position: sticky; top: 0; z-index: 4; border-bottom: 1px solid var(--border); background: var(--bg-raised); }
+.tt-corner { border-right: 1px solid var(--border); }
+.tt-day-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 2px 6px; padding: 8px 4px; border-right: 1px solid var(--border); color: var(--text-muted); font-size: 13px; text-align: center; }
+.tt-day-head:last-child { border-right: 0; }
+.tt-day-date { color: var(--text); font-size: 15px; font-weight: 600; }
+.tt-day-head.is-today { background: var(--accent-soft); color: var(--accent-ink); }
+.tt-day-head.is-today .tt-day-date { color: var(--accent-ink); }
+.tt-today-tag { padding: 0 6px; border: 1px solid var(--accent); border-radius: 999px; font-size: 11px; font-weight: 600; }
+
+.tt-main { position: relative; height: calc(var(--rows) * var(--hour)); }
+.tt-hours { position: relative; border-right: 1px solid var(--border); }
+.tt-hour { position: absolute; top: calc(var(--row) * var(--hour)); right: 6px; padding-top: 3px; color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tt-column {
+  position: relative;
+  border-right: 1px solid var(--border);
+  background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px var(--hour));
+  cursor: cell;
+}
+.tt-column:last-child { border-right: 0; }
+.tt-column.is-today { background-color: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+
+.tt-block {
+  position: absolute;
+  top: var(--top);
+  left: calc(2px + var(--lane) * (100% - 4px) / var(--lanes));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: calc((100% - 4px) / var(--lanes) - 2px);
+  height: var(--height);
+  overflow: hidden;
+  padding: 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--space, var(--c-slate)) 35%, transparent);
+  border-left: 3px solid var(--space, var(--c-slate));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--space, var(--c-slate)) 14%, var(--bg-raised));
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+.tt-block:hover { background: color-mix(in srgb, var(--space, var(--c-slate)) 22%, var(--bg-raised)); }
+.tt-block:focus-visible { z-index: 3; outline: 2px solid var(--accent); outline-offset: 1px; }
+.tt-block-title { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tt-block-meta, .tt-block-kind { overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.tt-block.is-short { flex-direction: row; align-items: center; gap: 6px; padding-block: 0; }
+.tt-block.is-short .tt-block-title { flex: 0 0 auto; max-width: 65%; }
+.tt-block.is-short .tt-block-meta { flex: 0 1 auto; min-width: 0; }
+.tt-block.is-cancelled { border-style: dashed; background: var(--bg-raised); color: var(--text-muted); }
+.tt-block.is-cancelled .tt-block-title { text-decoration: line-through; }
+.tt-tag { display: inline-block; margin-right: 2px; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; text-decoration: none; text-transform: uppercase; vertical-align: 1px; }
+
+.tt-now { position: absolute; top: var(--top); right: 0; left: 0; z-index: 3; height: 2px; background: var(--danger); pointer-events: none; }
+.tt-now::before { position: absolute; top: -4px; left: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); content: ''; }
+
+/* -- Agenda --------------------------------------------------------------------------- */
+.tt-agenda { display: flex; flex-direction: column; gap: 18px; }
+.tt-agenda-day .section-title.is-today { color: var(--accent-ink); }
+.tt-agenda-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.tt-agenda-row { display: flex; align-items: baseline; gap: 14px; width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-left: 3px solid var(--space, var(--c-slate)); border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text); text-align: left; cursor: pointer; }
+.tt-agenda-row:hover { background: var(--bg-hover); }
+.tt-agenda-row.is-cancelled { border-left-style: dashed; color: var(--text-muted); }
+.tt-agenda-row.is-cancelled .tt-agenda-title { text-decoration: line-through; }
+.tt-agenda-time { flex: none; width: 96px; color: var(--text-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tt-agenda-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tt-agenda-title { font-weight: 600; overflow-wrap: anywhere; }
+.tt-agenda-meta { color: var(--text-muted); font-size: 13px; }
+
+/* -- Block editor --------------------------------------------------------------------- */
+.dialog-block { width: min(620px, calc(100vw - 2 * var(--gutter))); }
+.block-scope { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.block-scope legend { padding: 0 4px; }
+.block-cancelled-note { color: var(--text-muted); }
+.block-location { flex: 1; }
+.block-time-row .field { flex: 1; min-width: 0; }
+.block-repeat { margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.block-repeat .field-row { flex-wrap: wrap; margin-top: 8px; }
+.block-repeat .field-row .field { flex: 1 1 140px; margin-bottom: 0; }
+.block-days { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; border: 0; }
+.block-days legend { width: 100%; margin-bottom: 4px; }
+.day-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; cursor: pointer; }
+.day-toggle:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.day-toggle input { accent-color: var(--accent); }
+.block-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.block-link { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.block-link .field-label { width: 140px; margin: 0; }
+.block-link-text { flex: 1; min-width: 120px; overflow-wrap: anywhere; }
+.block-links .field { margin: 4px 0 0; }
+.block-notes { width: 100%; resize: vertical; }
+.block-conflicts { margin-bottom: 10px; padding: 8px 12px; border: 1px solid var(--warning-border); border-radius: var(--radius); background: var(--warning-soft); font-size: 13px; }
+.block-conflicts:empty { display: none; }
+.block-conflicts-title { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.block-conflicts ul { margin: 4px 0 0; padding-left: 20px; }
+.block-actions { align-items: center; }
+.block-actions-gap { flex: 1; }
+.semester-list { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; padding: 0; list-style: none; }
+.semester-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 4px 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.semester-name { font-weight: 600; }
+.semester-dates { flex: 1; color: var(--text-muted); font-size: 13px; }
+.semester-form { padding-top: 4px; }
+.semester-form .field-row .field { flex: 1; }
+
+/* -- Dashboard schedule --------------------------------------------------------------- */
+.dash-schedule { display: flex; flex-direction: column; gap: 6px; }
+.schedule-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; padding: 7px 10px; border-left: 3px solid var(--space, var(--c-slate)); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: color-mix(in srgb, var(--space, var(--c-slate)) 9%, transparent); color: var(--text); text-decoration: none; }
+.schedule-row:hover { background: color-mix(in srgb, var(--space, var(--c-slate)) 16%, transparent); }
+.schedule-label { grid-column: 1 / -1; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.schedule-title { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-time { color: var(--text-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.schedule-later { color: var(--text-muted); font-size: 13px; }
+
+@media (max-width: 560px) {
+  .tt-label-wide { display: none; }
+  .tt-toolbar { align-items: stretch; }
+  .tt-jump { margin-left: 0; }
+  .tt-agenda-row { flex-direction: column; gap: 2px; }
+  .tt-agenda-time { width: auto; }
+  .block-link .field-label { width: 100%; }
+}
+
+/* -- Dragging ------------------------------------------------------------------------- */
+.tt-body.is-dragging, body.is-dragging-task { cursor: grabbing; user-select: none; }
+.tt-resize { position: absolute; right: 0; bottom: 0; left: 0; height: 7px; cursor: ns-resize; }
+.tt-block.is-dragged { z-index: 6; box-shadow: var(--shadow-md); opacity: 0.9; pointer-events: none; }
+.tt-block.is-dragged::after { position: absolute; right: 4px; bottom: 2px; padding: 0 4px; border-radius: 4px; background: var(--bg-raised); color: var(--text); font-size: 11px; font-weight: 600; content: attr(data-drag-time); }
+.tt-ghost { position: absolute; top: var(--top); right: 2px; left: 2px; z-index: 5; height: var(--height); padding: 2px 6px; border: 2px dashed var(--accent); border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12px; font-weight: 600; pointer-events: none; }
+.tt-column.is-drop { background-color: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.tt-task-ghost { position: fixed; top: var(--y); left: var(--x); z-index: 1000; max-width: 240px; overflow: hidden; padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-raised); box-shadow: var(--shadow-md); color: var(--text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; transform: translate(10px, 10px); pointer-events: none; }
+
+/* -- Task blocks and the task list ---------------------------------------------------- */
+.tt-block.is-task { padding-right: 24px; }
+.tt-block-open { display: flex; flex-direction: column; gap: 1px; width: 100%; height: 100%; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tt-block.is-short .tt-block-open { flex-direction: row; align-items: center; gap: 6px; }
+.tt-block-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tt-task-check { position: absolute; top: 4px; right: 4px; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.tt-block.is-done { background: var(--bg-raised); }
+.tt-block.is-done .tt-block-title { color: var(--text-muted); text-decoration: line-through; }
+.tt-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 14px; align-items: start; }
+.tt-layout-main { min-width: 0; }
+.tt-tasks { max-height: min(72vh, 900px); overflow: auto; padding: 12px 12px 6px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
+.tt-tasks .field-hint { margin: 0 0 8px; }
+.tt-task-list { margin: 0; padding: 0; list-style: none; }
+.tt-task-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--border); }
+.tt-task-grip { flex: none; display: inline-flex; padding: 4px 2px; color: var(--text-faint); cursor: grab; touch-action: none; }
+.tt-task-main { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.tt-task-text { overflow-wrap: anywhere; font-size: 14px; }
+.tt-task-from { overflow: hidden; color: var(--text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.block-task, .block-session { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 12px; }
+.block-task-from { color: var(--text-muted); font-size: 13px; }
+
+/* -- Weekly summary ------------------------------------------------------------------- */
+.tt-week-summary { margin-top: 20px; }
+.tt-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; }
+.tt-summary-head { margin-bottom: 6px; font-size: 14px; font-weight: 600; }
+
+/* -- Free time and .ics import -------------------------------------------------------- */
+.free-options { flex-wrap: wrap; }
+.free-options .field { flex: 1 1 120px; }
+.free-results { margin-top: 10px; }
+.free-day { margin-bottom: 12px; }
+.free-list, .ics-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.free-slot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text); text-align: left; cursor: pointer; }
+.free-slot:hover { background: var(--bg-hover); }
+.free-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+.free-length { color: var(--text-muted); font-size: 13px; }
+.free-add { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--accent-ink); font-size: 13px; }
+.ics-list { max-height: 50vh; overflow-y: auto; margin-bottom: 4px; }
+.ics-row { padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.ics-label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.ics-label input { margin-top: 3px; accent-color: var(--accent); }
+.ics-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ics-title { font-weight: 600; overflow-wrap: anywhere; }
+.ics-when { color: var(--text-muted); font-size: 13px; }
+.ics-problem { color: var(--text-muted); font-size: 13px; font-style: italic; }
+.ics-row.is-blocked .ics-label { cursor: default; }
+
+@media (max-width: 900px) {
+  .tt-layout { grid-template-columns: 1fr; }
+  .tt-tasks { max-height: none; }
+}
+@media (max-width: 560px) {
+  .tt-summary-grid { grid-template-columns: 1fr; }
+}
+
+/* -- Printing a week ------------------------------------------------------------------ */
+@media print {
+  @page { size: landscape; margin: 10mm; }
+  .timetable.page-wide { max-width: none; padding: 0; }
+  .timetable .tt-quick, .timetable .tt-toolbar, .timetable .page-actions, .tt-tasks, .tt-hint, .tt-resize, .tt-now, .tt-task-check { display: none !important; }
+  .tt-layout { display: block; }
+  .tt-scroll { max-height: none; overflow: visible; border-color: #888; }
+  .tt-head { position: static; }
+  .tt-days-7 { min-width: 0; }
+  .tt-column, .tt-hours, .tt-corner, .tt-day-head { border-color: #bbb; }
+  .tt-block { break-inside: avoid; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .tt-day-head.is-today, .tt-column.is-today { background: none; }
+  .tt-week-summary { break-inside: avoid; }
+}

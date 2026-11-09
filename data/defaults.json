@@ -1,0 +1,61 @@
+{
+  "spaces": [
+    {
+      "name": "School",
+      "icon": "🎓",
+      "color": "sky",
+      "collections": [
+        {
+          "name": "DL-FS2026",
+          "defaultTypeId": "course",
+          "children": [
+            { "name": "Lecture notes", "defaultTypeId": "course" },
+            { "name": "Assignments", "defaultTypeId": "checklist" },
+            { "name": "Exam prep", "defaultTypeId": "course" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Personal",
+      "icon": "🌿",
+      "color": "sage",
+      "collections": [
+        { "name": "2026 Journal", "defaultTypeId": "journal" },
+        { "name": "To-dos", "defaultTypeId": "checklist" },
+        { "name": "Ideas", "defaultTypeId": "free" }
+      ]
+    },
+    {
+      "name": "Fun",
+      "icon": "🎬",
+      "color": "plum",
+      "collections": [
+        { "name": "Movies to watch", "defaultTypeId": "watchlist" },
+        { "name": "When I'm bored", "defaultTypeId": "idea" },
+        { "name": "Books and games", "defaultTypeId": "media" },
+        { "name": "Recipes to try", "defaultTypeId": "free" },
+        { "name": "Quotes", "defaultTypeId": "quote" }
+      ]
+    },
+    {
+      "name": "Career",
+      "icon": "💼",
+      "color": "amber",
+      "collections": [
+        { "name": "Goals", "defaultTypeId": "goal" },
+        { "name": "Meetings", "defaultTypeId": "meeting" },
+        { "name": "Reading list", "defaultTypeId": "link" }
+      ]
+    },
+    {
+      "name": "Home",
+      "icon": "🏠",
+      "color": "clay",
+      "collections": [
+        { "name": "Chores", "defaultTypeId": "checklist" },
+        { "name": "Projects", "defaultTypeId": "free" }
+      ]
+    }
+  ]
+}

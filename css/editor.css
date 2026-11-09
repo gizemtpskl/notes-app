@@ -1,0 +1,249 @@
+/*
+ * editor.css: the writing surface, toolbar, block menu and popovers.
+ * .review-body reuses the same content styles so a note looks the same wherever it appears.
+ */
+
+.editor-toolbar {
+  position: sticky;
+  top: 50px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin: 8px calc(var(--gutter) * -1) 14px;
+  padding: 4px var(--gutter);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.editor-toolbar::-webkit-scrollbar { display: none; }
+
+.tool-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.tool-btn:hover { background: var(--bg-hover); color: var(--text); }
+.tool-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.toolbar-sep { flex: none; width: 1px; height: 18px; margin: 0 5px; background: var(--border-strong); }
+
+.editor { position: relative; }
+
+.editor-content {
+  min-height: 42vh;
+  outline: none;
+  font-family: var(--font-read);
+  font-size: 18px;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+  caret-color: var(--accent);
+}
+.editor-content > :first-child { margin-top: 0; }
+
+.editor-content p, .review-body p { margin: 0 0 0.62em; }
+
+.editor-content h1, .editor-content h2, .editor-content h3,
+.review-body h1, .review-body h2, .review-body h3 {
+  font-family: var(--font-ui);
+  font-weight: 660;
+  letter-spacing: -0.012em;
+  line-height: 1.28;
+}
+.editor-content h1, .review-body h1 { margin: 1.25em 0 0.42em; font-size: 1.55em; }
+.editor-content h2, .review-body h2 { margin: 1.15em 0 0.38em; font-size: 1.28em; }
+.editor-content h3, .review-body h3 { margin: 1em 0 0.32em; font-size: 1.08em; }
+
+.editor-content ul, .editor-content ol, .review-body ul, .review-body ol { margin: 0 0 0.62em; padding-left: 1.5em; }
+.editor-content ul, .review-body ul { list-style: disc; }
+.editor-content ol, .review-body ol { list-style: decimal; }
+.editor-content li, .review-body li { margin: 0.14em 0; }
+.editor-content li > ul, .editor-content li > ol, .review-body li > ul, .review-body li > ol { margin-bottom: 0; }
+.editor-content li > ul, .review-body li > ul { list-style: circle; }
+
+/* Check lists. The box is drawn with CSS so the caret behaves normally in the item's text. */
+.editor-content ul[data-type="check"], .review-body ul[data-type="check"] { padding-left: 0; list-style: none; }
+.editor-content ul[data-type="check"] ul[data-type="check"], .review-body ul[data-type="check"] ul[data-type="check"] { margin-left: 0; }
+.editor-content ul[data-type="check"] > li, .review-body ul[data-type="check"] > li { position: relative; padding-left: 1.75em; }
+.editor-content ul[data-type="check"] > li::before, .review-body ul[data-type="check"] > li::before {
+  content: "" / "not done";
+  position: absolute;
+  top: 0.3em;
+  left: 0.15em;
+  box-sizing: border-box;
+  width: 1.02em;
+  height: 1.02em;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--accent-text);
+  font-family: var(--font-ui);
+  font-size: 0.95em;
+  font-weight: 700;
+  line-height: 0.95em;
+  text-align: center;
+}
+.editor-content[contenteditable="true"] ul[data-type="check"] > li::before { cursor: pointer; }
+.editor-content ul[data-type="check"] > li[data-checked="true"]::before, .review-body ul[data-type="check"] > li[data-checked="true"]::before {
+  content: "✓" / "done";
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.editor-content ul[data-type="check"] > li[data-checked="true"], .review-body ul[data-type="check"] > li[data-checked="true"] {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--border-strong);
+}
+.editor-content ul[data-type="check"] > li[data-checked="true"] ul, .review-body ul[data-type="check"] > li[data-checked="true"] ul { color: var(--text); text-decoration: none; }
+
+.editor-content blockquote, .review-body blockquote {
+  margin: 0.8em 0;
+  padding: 0.05em 0 0.05em 1em;
+  border-left: 3px solid var(--space, var(--border-strong));
+  color: var(--text-muted);
+  font-style: italic;
+}
+.editor-content blockquote p:last-child, .review-body blockquote p:last-child { margin-bottom: 0; }
+.editor-content blockquote + blockquote { margin-top: -0.8em; }
+
+.editor-content code, .review-body code {
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  background: var(--bg-code);
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+}
+.editor-content pre, .review-body pre {
+  margin: 0.8em 0;
+  padding: 0.85em 1em;
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: var(--bg-code);
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  line-height: 1.55;
+  overflow-wrap: normal;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.editor-content a, .review-body a { color: var(--accent-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+.editor-content hr, .review-body hr { height: 1px; margin: 1.6em 0; border: 0; background: var(--border-strong); }
+
+.editor-content img, .review-body img { display: block; max-width: 100%; height: auto; margin: 0.6em 0; border-radius: var(--radius-sm); }
+.editor-content img.img-missing {
+  min-width: 180px;
+  min-height: 60px;
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.editor-content table, .review-body table { display: block; max-width: 100%; margin: 0.9em 0; overflow-x: auto; border-collapse: collapse; font-family: var(--font-ui); font-size: 0.82em; line-height: 1.45; }
+.editor-content th, .editor-content td, .review-body th, .review-body td { min-width: 90px; padding: 6px 10px; border: 1px solid var(--border-strong); vertical-align: top; text-align: left; }
+.editor-content th, .review-body th { background: var(--bg-code); font-weight: 620; }
+
+/* Hints in empty blocks */
+.editor-content.is-empty > p:first-child::before,
+.editor-content p.show-hint::before {
+  content: "Write something, or type / for blocks" / "";
+  position: absolute;
+  color: var(--text-faint);
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Block menu and popovers */
+.slash-menu {
+  position: fixed;
+  z-index: 50;
+  width: 280px;
+  max-width: calc(100vw - 16px);
+  max-height: 300px;
+  padding: 5px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-md);
+}
+.slash-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+}
+.slash-item:hover, .slash-item.is-active { background: var(--accent-soft); }
+.slash-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.slash-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.slash-label { font-size: 14px; font-weight: 500; }
+.slash-hint { color: var(--text-muted); font-size: 12px; }
+
+.editor-pop {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  max-width: calc(100vw - 16px);
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+}
+.pop-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.pop-btn:hover { background: var(--bg-hover); color: var(--text); }
+.pop-url { display: inline-flex; align-items: center; min-width: 0; gap: 5px; padding: 2px 7px; color: var(--accent-ink); text-decoration: none; }
+.pop-url svg { flex: none; }
+.pop-url span { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop-url:hover span { text-decoration: underline; }
+
+@media (min-width: 860px) {
+  .editor-toolbar { top: 0; margin-right: -8px; margin-left: -8px; padding-right: 8px; padding-left: 8px; }
+  .editor-content { font-size: 19px; }
+}

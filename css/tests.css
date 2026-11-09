@@ -1,0 +1,15 @@
+/* tests.css: the plain results page for /tests.html. */
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--font-ui); }
+.tests { max-width: 780px; margin: 0 auto; padding: 24px 16px 60px; }
+h1 { margin: 0 0 6px; font-size: 24px; }
+h2 { margin: 22px 0 6px; font-size: 15px; }
+.summary { margin: 0 0 12px; padding: 10px 13px; border-radius: 8px; background: var(--bg-code); font-weight: 600; }
+.summary.pass { background: var(--accent-soft); color: var(--accent-ink); }
+.summary.fail { background: var(--danger-soft); color: var(--danger); }
+ul { margin: 0; padding: 0; list-style: none; }
+li { padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.ok::before { content: "✓ "; color: var(--accent-ink); font-weight: 700; }
+.bad { color: var(--danger); font-weight: 600; }
+.bad::before { content: "✗ "; }
+pre { margin: 4px 0; white-space: pre-wrap; font: 12px/1.4 var(--font-mono); }
+.ms { color: var(--text-muted); font-size: 12px; }
