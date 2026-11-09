@@ -207,6 +207,15 @@ const CLEANERS = {
   meta: cleanMeta,
 };
 
+/** Checks one record from outside, such as from the Drive copy. null when it can't be used. */
+export function cleanRecord(store, raw, now = Date.now()) {
+  const clean = CLEANERS[store];
+  if (!clean) return null;
+  const record = clean(raw, now);
+  if (record && store === 'notes') return { ...record, links: [] };
+  return record;
+}
+
 /**
  * Parses and validates a backup file's text. Never throws.
  * Returns { ok: false, error } or { ok: true, data, summary, warnings }.
@@ -242,6 +251,8 @@ export function parseImport(text, now = Date.now()) {
     let skipped = 0;
     for (const item of raw) {
       const record = clean(item, now);
+      // When it last changed, for sync: kept, so a restore is never newer than the original.
+      if (record && Number.isFinite(item.syncAt) && item.syncAt >= 0) record.syncAt = item.syncAt;
       if (record) byId.set(record.id, record);
       else skipped += 1;
     }
@@ -278,7 +289,9 @@ export async function applyImport(db, data, mode) {
     ...data.versions.map((record) => ({ store: 'versions', id: record.id, value: record })),
   ]);
   const incoming = mode === 'replace' ? data : mergeTagsByName(db, data);
-  const { undo } = db.undoable(() => {
+  // Records keep the times they were last changed, so a restored backup never counts as newer
+  // than edits made since on another device.
+  const { undo } = db.withSyncTimes(() => db.undoable(() => {
     const stores = MEMORY_STORES.filter((store) => store !== 'meta');
     if (mode === 'replace') {
       for (const store of stores) {
@@ -301,7 +314,7 @@ export async function applyImport(db, data, mode) {
     db.repairIntegrity();
     db.rebuildLinks();
     db._put('meta', { id: 'onboarded', value: true });
-  });
+  }));
   await db.flush();
   return undo;
 }

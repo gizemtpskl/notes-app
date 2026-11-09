@@ -37,12 +37,14 @@ import { BUILTIN_TEMPLATES, notePropsFromTemplate, templateFromNote } from './te
 import { fold } from './text.js';
 import { blockProblem, createSemester, createTimeBlock, toMinutes } from './timetable.js';
 import { createHabit, toggleHabitDay } from './habits.js';
+import { syncsRecord } from './syncScope.js';
 import { isDateStr } from './dates.js';
 import {
   BUILTIN_TYPES, autoTitleFor, createCustomType, defaultFieldValues, fieldsToHtml, noteDueDate,
 } from './types.js';
 
 const FLUSH_DELAY_MS = 250;
+const TOMBSTONES_KEY = 'syncDeleted';
 /** Changing any of these changes what lists or the sidebar show. */
 const STRUCTURAL_NOTE_KEYS = ['spaceId', 'collectionId', 'archived', 'trashedAt', 'pinned', 'favorite', 'typeId', 'tagIds'];
 /** Changing any of these counts as editing, and bumps the note's `updated` time. */
@@ -117,6 +119,11 @@ export class NotesDb {
     try {
       return fn();
     } finally {
+      // Deletions noted during the batch are saved once, as one record.
+      if (this._batchDepth === 1 && this._tombDirty) {
+        this._tombDirty = false;
+        this._put('meta', { id: TOMBSTONES_KEY, value: Object.fromEntries(this._tombstones()) });
+      }
       this._batchDepth -= 1;
       if (this._batchDepth === 0) {
         const change = this._change;
@@ -169,7 +176,78 @@ export class NotesDb {
     // Otherwise it was created by the operation and edited since, so it is kept.
   }
 
+  // -- Change times, for sync ------------------------------------------------------------
+  //
+  // Every record that syncs carries syncAt: when it last changed on any device. Deletions are
+  // remembered in one meta record, { "store:id": time }, so a deleted note isn't brought back by a
+  // device that still has it. Sync (sync.js) compares these times. Imports and sync itself keep
+  // the times records already have: see withSyncTimes().
+
+  _tombstones() {
+    this._tombCache ??= new Map(Object.entries(this.getMeta(TOMBSTONES_KEY) ?? {}));
+    return this._tombCache;
+  }
+
+  /** Deletions remembered for sync: { "store:id": time }. */
+  syncTombstones() {
+    return Object.fromEntries(this._tombstones());
+  }
+
+  /**
+   * Runs fn as one batch, keeping the change times records already carry instead of stamping
+   * them now. deletedAt gives the time to remember for deletions ("store:id" => time).
+   */
+  withSyncTimes(fn, deletedAt = new Map()) {
+    const previous = this._syncTimes;
+    this._syncTimes = deletedAt;
+    try {
+      return this.batch(fn);
+    } finally {
+      this._syncTimes = previous;
+    }
+  }
+
+  /** Remembers deletions made on other devices, for records this one never had. */
+  adoptTombstones(deleted) {
+    this.batch(() => {
+      const map = this._tombstones();
+      for (const [key, at] of Object.entries(deleted)) {
+        const store = key.slice(0, key.indexOf(':'));
+        const id = key.slice(key.indexOf(':') + 1);
+        if (this.data[store]?.has(id)) continue;
+        if (!map.has(key) || map.get(key) < at) {
+          map.set(key, at);
+          this._tombDirty = true;
+        }
+      }
+    });
+  }
+
+  /** Forgets deletions older than a cutoff, so the list doesn't grow forever. */
+  pruneTombstones(before) {
+    this.batch(() => {
+      for (const [key, at] of this._tombstones()) {
+        if (at < before) {
+          this._tombstones().delete(key);
+          this._tombDirty = true;
+        }
+      }
+    });
+  }
+
+  _stamp(store, record) {
+    if (!syncsRecord(store, record)) return record;
+    const key = `${store}:${record.id}`;
+    if (this._tombstones().has(key)) {
+      this._tombstones().delete(key);
+      this._tombDirty = true;
+    }
+    if (this._syncTimes) return record.syncAt ? record : { ...record, syncAt: record.updated ?? record.created ?? 0 };
+    return { ...record, syncAt: Date.now() };
+  }
+
   _put(store, record) {
+    record = this._stamp(store, record);
     const frozen = Object.isFrozen(record) ? record : Object.freeze(record);
     this._record(store, record.id, this.data[store].get(record.id) ?? null, frozen);
     this.data[store].set(record.id, frozen);
@@ -179,6 +257,11 @@ export class NotesDb {
   _remove(store, id) {
     const previous = this.data[store].get(id);
     if (!previous) return;
+    if (syncsRecord(store, previous)) {
+      const key = `${store}:${id}`;
+      this._tombstones().set(key, this._syncTimes?.get(key) ?? Date.now());
+      this._tombDirty = true;
+    }
     this._record(store, id, previous, null);
     this.data[store].delete(id);
   }
@@ -266,6 +349,7 @@ export class NotesDb {
   _applyRemote(ops) {
     const change = { stores: new Set(), ids: new Set(), structural: false, source: 'remote' };
     for (const { store, id, value } of ops) {
+      if (store === 'meta' && id === TOMBSTONES_KEY) this._tombCache = null;
       const previous = this.data[store].get(id) ?? null;
       if (value === null) this.data[store].delete(id);
       else this.data[store].set(id, Object.freeze(value));
@@ -1348,6 +1432,7 @@ export class NotesDb {
     await this._writeChain;
     await this.storage.clear();
     for (const store of MEMORY_STORES) this.data[store].clear();
+    this._tombCache = null;
     this._channel?.postMessage('erased');
     this._structureVersion += 1;
   }

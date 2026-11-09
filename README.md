@@ -71,8 +71,9 @@ Today's tasks, Schedule, Next 7 days and Weekly progress are also available in *
 - There is no copy anywhere else. Clearing your browser data or losing the device loses your notes unless you have a backup. The app reminds you after 14 days without one.
 - **Backups:** Settings has a JSON backup of everything, including images and version history, which can be imported again. Markdown exports (a note, a collection, or everything as a zip) are for reading elsewhere.
 - **Passcode lock (optional):** encrypts everything stored on the device with AES-GCM, using a key protected by your passcode (PBKDF2 with SHA-256, 600,000 rounds). **A forgotten passcode cannot be recovered.** Backup files are not encrypted, so keep them somewhere safe. The lock protects what's stored on the device, for instance from someone reading the browser's files. It doesn't protect against anything running in the browser while the app is unlocked. It needs https or localhost.
+- **Google Drive sync (optional, off by default):** a copy of your notes in a hidden folder in your own Google Drive, encrypted with your passphrase if you choose one. See [Sync with Google Drive](#sync-with-google-drive).
 - **Google Calendar (optional, off by default):** when you set it up in **Settings → Google Calendar**, the text, date and time of tasks that have a time go to your main Google calendar, and today's events are copied to the Today page. Tasks in private notes are never sent. The access token stays in memory only, and the link's data is left out of backups.
-- A strict Content Security Policy blocks injected scripts and every external request except to Google's sign-in and Calendar addresses, which the app only contacts once Google Calendar is turned on. Opening a note can never contact another site.
+- A strict Content Security Policy blocks injected scripts and every external request except to Google's sign-in, Drive and Calendar addresses, which the app only contacts once sync or Calendar is turned on. Opening a note can never contact another site.
 
 ## How notes are organized
 
@@ -122,6 +123,7 @@ erDiagram
 Rules worth knowing:
 
 - A note is in the Inbox exactly when `spaceId` is `null`.
+- Every record that syncs carries `syncAt`, when it last changed. Deletions are remembered in the `syncDeleted` meta record. Sync compares these to merge devices (`js/data/sync.js`).
 - `note.links` is always worked out from the body and "Link to a note" fields. Backlinks aren't stored at all.
 - Field values are stored by field id, so renaming a field keeps its data, and changing a note's type and back loses nothing.
 - Built-in types and templates live in the code. They are never stored or exported.
@@ -162,6 +164,7 @@ js/
     dashboard.js          Which dashboard widgets show, in what order and size
     agenda.js             What a day and a week hold, for Your day and Your week
     googleCalendar.js     The optional Google Calendar link
+    sync.js, syncScope.js Merging copies for Google Drive sync, and what syncs
     flashcards.js, journal.js, tasks.js, taskText.js, daily.js, picker.js, tidy.js, weekly.js, stats.js, filing.js, dates.js, text.js, zip.js
   editor/               The rich text editor, math and code colors
   ui/                   Small building blocks: elements, dialogs, menus, toasts, icons
@@ -169,6 +172,17 @@ js/
 ```
 
 `js/data/db.js` explains how the data layer works at the top of the file, and how to add an operation.
+
+## Sync with Google Drive
+
+Optional and free. Turn it on in **Settings → Sync with Google Drive** on each device, with the same Google project and passphrase. Your notes are then kept in a hidden app folder in your own Google Drive, and every device where sync is on has the same notes.
+
+- **Private:** with a passphrase (recommended), everything is encrypted on the device before it's sent, so Google can't read it. Forgetting the passphrase makes the copy in Drive unreadable, but the notes on your devices stay safe.
+- **When it syncs:** a few seconds after a change, when the app comes back into view, and every few minutes. Google only allows signing in from a click, so after the app opens, click **Sign in to sync** at the bottom of the sidebar once.
+- **Two devices, same note:** the newer edit wins. The older one is kept in that note's **Version history** on the device where the two meet, so nothing is lost silently. Deletions sync too.
+- **A new device:** choose **Start empty** when the app first opens, then turn sync on. Starting with the suggested setup would add a second set of spaces.
+- **What syncs:** notes, spaces, collections, your note types, tags, saved views, templates, the timetable, habits, settings and images. Version history, the passcode lock and Google sign-in details stay on each device.
+- **Setup:** use the same Google project as for Calendar, and turn on the Google Drive API for it.
 
 ## Connect Google Calendar
 

@@ -1,9 +1,7 @@
 /**
- * calendarConnection.js: signing in to Google and keeping the calendar in step.
- *
- * Google's sign-in library only loads once Google Calendar has been set up in Settings, and the
- * access token stays in memory, so it's gone after a reload. Google only allows asking for a new
- * one from a click, so an expired sign-in shows a button rather than popping up by itself.
+ * calendarConnection.js: keeping Google Calendar in step. The sign-in itself is shared with
+ * Drive sync, in googleAuth.js. An expired sign-in shows a button rather than popping up by
+ * itself, since Google only allows asking from a click.
  */
 import { app } from '../context.js';
 import { toDateStr } from '../data/dates.js';
@@ -11,16 +9,13 @@ import {
   CALENDAR_SCOPE, CalendarAuthError, calendarConfig, createCalendarApi, removeAllEvents, runSync, saveEvents,
   updateCalendarConfig,
 } from '../data/googleCalendar.js';
-import { h } from '../ui/dom.js';
+import {
+  forgetGoogleToken, googleSignIn, googleToken, hasGoogleToken, loadGoogleLibrary, registerGoogleFeature, revokeGoogleUnlessUsed,
+} from './googleAuth.js';
 
-const LIBRARY_URL = 'https://accounts.google.com/gsi/client';
 const SYNC_DELAY_MS = 3000;
 const EVENTS_REFRESH_MS = 10 * 60000;
-const EXPIRY_MARGIN_MS = 60000;
 
-let token = '';
-let tokenExpires = 0;
-let library = null;
 let timer = null;
 let running = null;
 let again = false;
@@ -43,62 +38,11 @@ export function onCalendarStatus(listener) {
 
 export const calendarStatus = () => status;
 
-const hasToken = () => Boolean(token) && Date.now() < tokenExpires - EXPIRY_MARGIN_MS;
+const hasToken = () => hasGoogleToken(CALENDAR_SCOPE);
+const api = () => createCalendarApi(googleToken);
+const signIn = (clientId) => googleSignIn(clientId, CALENDAR_SCOPE, 'Google Calendar');
 
-function forgetToken() {
-  token = '';
-  tokenExpires = 0;
-}
-
-const api = () => createCalendarApi(() => token);
-
-/** Loads Google's library. Doing this ahead of the click keeps the sign-in window from being blocked. */
-export function loadGoogleLibrary() {
-  library ??= new Promise((resolve, reject) => {
-    // Google asks for this on plain http, which in practice means localhost.
-    if (location.protocol === 'http:') document.head.append(h('meta', { name: 'referrer', content: 'no-referrer-when-downgrade' }));
-    const script = document.createElement('script');
-    script.src = LIBRARY_URL;
-    script.async = true;
-    script.addEventListener('load', () => resolve(window.google));
-    script.addEventListener('error', () => {
-      library = null;
-      script.remove();
-      reject(new Error("Couldn't reach Google. Check your connection and try again."));
-    });
-    document.head.append(script);
-  });
-  return library;
-}
-
-/** Asks Google for a token. Call this straight from a click. */
-async function signIn(clientId) {
-  const google = await loadGoogleLibrary();
-  return new Promise((resolve, reject) => {
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: CALENDAR_SCOPE,
-      prompt: '',
-      callback: (response) => {
-        if (!response?.access_token) {
-          reject(new Error(response?.error === 'access_denied' ? 'Google Calendar access was declined.' : "Google didn't allow the sign-in. Check the steps above."));
-        } else if (!google.accounts.oauth2.hasGrantedAllScopes(response, CALENDAR_SCOPE)) {
-          reject(new Error('Google Calendar access wasn’t ticked on the Google page. Connect again and tick it.'));
-        } else {
-          token = response.access_token;
-          tokenExpires = Date.now() + Number(response.expires_in ?? 3600) * 1000;
-          resolve();
-        }
-      },
-      error_callback: (error) => {
-        reject(new Error(error?.type === 'popup_failed_to_open'
-          ? 'Your browser blocked the Google window. Allow pop-ups for this site, then try again.'
-          : 'The Google window closed before signing in finished.'));
-      },
-    });
-    client.requestAccessToken();
-  });
-}
+export { loadGoogleLibrary };
 
 function explain(error) {
   if (error?.reason === 'accessNotConfigured') return 'The Google Calendar API isn’t turned on in your Google project yet.';
@@ -139,7 +83,7 @@ export function syncCalendar({ refreshEvents = true } = {}) {
     })
     .catch((error) => {
       if (error instanceof CalendarAuthError) {
-        forgetToken();
+        forgetGoogleToken();
         setStatus('signed-out');
       } else {
         console.warn('Calendar sync:', error);
@@ -185,10 +129,9 @@ export async function disconnectCalendar({ removeEvents }) {
     if (!hasToken()) await signIn(calendarConfig(db).clientId);
     failed = await removeAllEvents(db, api());
   }
-  if (token && window.google) window.google.accounts.oauth2.revoke(token, () => {});
-  forgetToken();
   clearTimeout(timer);
   updateCalendarConfig(db, { on: false });
+  revokeGoogleUnlessUsed();
   setStatus('signed-out');
   return failed;
 }
@@ -196,6 +139,7 @@ export async function disconnectCalendar({ removeEvents }) {
 /** Runs once at startup. Does nothing at all until the calendar has been set up. */
 export function startCalendarSync() {
   const { db } = app;
+  registerGoogleFeature('calendar', { scope: CALENDAR_SCOPE, isOn: () => calendarConfig(db).on });
   if (calendarConfig(db).on) loadGoogleLibrary().catch(() => {}); // Ready for the first click.
   db.on((change) => {
     if (change.stores.has('notes') && hasToken()) scheduleSync();

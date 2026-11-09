@@ -8,6 +8,9 @@ import { parseTaskLine, parseTaskList } from '../data/taskText.js';
 import { blocksToIcs, eventToBlock, parseIcs, readDateTime } from '../data/ics.js';
 import { INTERVALS, isDue, nextReview, reviewQueue } from '../data/review.js';
 import { dayAgenda, weekAgenda } from '../data/agenda.js';
+import {
+  createSyncKey, latestChange, mergeSnapshots, openSyncKey, packSnapshot, peekSnapshot, snapshotOf, stampOf, unpackSnapshot,
+} from '../data/sync.js';
 import { cleanHabit, createHabit, habitStreak, lastWeek, toggleHabitDay } from '../data/habits.js';
 import {
   WIDGETS, dashboardLayout, greeting, moveWidget, updateWidget,
@@ -1426,6 +1429,207 @@ describe('Your day and your week', () => {
     equal(totals, {
       minutes: 210, blocks: 2, tasks: 2, tasksDone: 1, deadlines: 1,
     });
+  });
+});
+
+describe('Sync between devices', () => {
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 3));
+  const titles = (db) => db.listNotes().map((n) => n.title).sort();
+
+  /** Two devices sharing one Drive copy, in memory: merge both ways, like driveSync.js does. */
+  async function syncPair(a, b) {
+    for (const [here, there] of [[a, b], [b, a], [a, b]]) {
+      const result = mergeSnapshots(snapshotOf(here), snapshotOf(there), { since: here.lastSync ?? 0 });
+      here.withSyncTimes(() => {
+        for (const { store, record } of result.puts) here._put(store, record);
+        for (const { store, id } of result.removes) here._remove(store, id);
+        here.rebuildLinks();
+      }, new Map(result.removes.map((r) => [`${r.store}:${r.id}`, r.at])));
+      here.adoptTombstones(result.merged.deleted);
+      here.lastSync = Date.now();
+      await tick();
+    }
+  }
+
+  it('stamps each change with when it happened, and keeps an import’s own times', async () => {
+    const db = await freshDb();
+    const before = Date.now();
+    const note = db.createNote({ title: 'One' });
+    assert(note.syncAt >= before, 'a new note is stamped now');
+    await tick();
+    const edited = db.updateNote(note.id, { title: 'Two' });
+    assert(edited.syncAt > note.syncAt, 'an edit is stamped later');
+    const copy = await freshDb();
+    const backup = JSON.parse(JSON.stringify(await buildExport(db)));
+    await applyImport(copy, parseImport(JSON.stringify(backup)).data, 'replace');
+    equal(copy.getNote(note.id).syncAt, edited.syncAt, 'a restored backup keeps each change time');
+    backup.data.notes[0].updated = 1000;
+    delete backup.data.notes[0].syncAt;
+    const older = await freshDb();
+    await applyImport(older, parseImport(JSON.stringify(backup)).data, 'replace');
+    equal(older.getNote(note.id).syncAt, 1000, 'a backup from before sync existed counts from its last edit');
+  });
+
+  it('remembers deletions, and forgets them when the record comes back', async () => {
+    const db = await freshDb();
+    const note = db.createNote({ title: 'Gone' });
+    db.trashNotes([note.id]);
+    db.purgeNotes([note.id]);
+    assert(db.syncTombstones()[`notes:${note.id}`] > 0);
+    const { undo } = db.undoable(() => db.createNote({ id: note.id, title: 'Back' }));
+    equal(db.syncTombstones()[`notes:${note.id}`], undefined);
+    undo();
+    assert(db.syncTombstones()[`notes:${note.id}`] > 0, 'undoing brings the deletion back');
+    db.pruneTombstones(Date.now() + 1);
+    equal(db.syncTombstones(), {});
+  });
+
+  it('two devices end up with each other’s notes', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    a.createNote({ title: 'From the Mac' });
+    b.createNote({ title: 'From the phone' });
+    await syncPair(a, b);
+    equal(titles(a), ['From the Mac', 'From the phone']);
+    equal(titles(b), titles(a));
+  });
+
+  it('the newer edit wins, and the losing edit is reported', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    const note = a.createNote({ title: 'Draft' });
+    await syncPair(a, b);
+    a.updateNote(note.id, { body: '<p>Mac version</p>' });
+    await tick();
+    b.updateNote(note.id, { body: '<p>Phone version</p>' });
+    const result = mergeSnapshots(snapshotOf(a), snapshotOf(b), { since: a.lastSync });
+    equal(result.conflicts.map((c) => c.record.text), ['Mac version'], 'the Mac’s unsynced edit lost, and is reported');
+    const otherWay = mergeSnapshots(snapshotOf(b), snapshotOf(a), { since: b.lastSync });
+    equal(otherWay.conflicts.map((c) => c.record.text), ['Mac version'], 'and reported on the phone too, where the newer edit won');
+    await syncPair(a, b);
+    equal(a.getNote(note.id).text, 'Phone version');
+    equal(b.getNote(note.id).text, 'Phone version');
+  });
+
+  it('a deletion reaches the other device, and an older edit doesn’t undo it', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    const note = a.createNote({ title: 'Old' });
+    await syncPair(a, b);
+    a.trashNotes([note.id]);
+    a.purgeNotes([note.id]);
+    await syncPair(a, b);
+    equal(b.getNote(note.id), null);
+    equal(titles(b), []);
+  });
+
+  it('an edit made after a deletion brings the note back', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    const note = a.createNote({ title: 'Keep me' });
+    await syncPair(a, b);
+    a.purgeNotes([note.id]);
+    await tick();
+    b.updateNote(note.id, { title: 'Kept' });
+    await syncPair(a, b);
+    equal(a.getNote(note.id)?.title, 'Kept');
+  });
+
+  it('a third device learns about a deletion it never saw happen', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    const c = await freshDb();
+    const note = a.createNote({ title: 'Shared' });
+    await syncPair(a, b);
+    await syncPair(a, c);
+    b.purgeNotes([note.id]);
+    await syncPair(b, a);
+    await syncPair(a, c);
+    equal(c.getNote(note.id), null);
+  });
+
+  it('merging twice changes nothing, so syncing again sends nothing', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    a.createNote({ title: 'One' });
+    await syncPair(a, b);
+    const again = mergeSnapshots(snapshotOf(a), snapshotOf(b), { since: a.lastSync });
+    equal([again.puts.length, again.removes.length, again.remoteChanged], [0, 0, false]);
+  });
+
+  it('settings sync, while device details stay behind', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    a.updateSettings({ theme: 'dark' });
+    a.setMeta('driveSync', { on: true });
+    await syncPair(a, b);
+    equal(b.getSettings().theme, 'dark');
+    equal(b.getMeta('driveSync'), null);
+  });
+
+  it('built-in note types are never part of the copy', async () => {
+    const db = await freshDb();
+    assert(!Object.keys(snapshotOf(db).records).some((k) => k === 'noteTypes:free'));
+  });
+
+  it('timetable blocks and habits sync too', async () => {
+    const a = await freshDb();
+    const b = await freshDb();
+    a.createBlock({ title: 'German', date: '2026-11-10', start: '18:00', end: '19:00' });
+    a.createHabit({ name: 'Stretch' });
+    await syncPair(a, b);
+    equal([b.listBlocks().length, b.listHabits().length], [1, 1]);
+  });
+
+  it('packs and unpacks a copy, and encrypts it with a passphrase', async () => {
+    const db = await freshDb();
+    db.createNote({ title: 'Secret plan', body: '<p>Top secret</p>' });
+    const plain = await packSnapshot(snapshotOf(db));
+    assert(plain.includes('Secret plan'));
+    equal(Object.keys((await unpackSnapshot(plain)).records).length, Object.keys(snapshotOf(db).records).length);
+    const { key, lock } = await createSyncKey('correct horse battery');
+    const sealed = await packSnapshot(snapshotOf(db), { key, lock });
+    assert(!sealed.includes('Secret') && !sealed.includes('Top secret'), 'nothing readable in the encrypted file');
+    equal(peekSnapshot(sealed).encrypted, true);
+    let thrown = null;
+    try {
+      await unpackSnapshot(sealed);
+    } catch (error) {
+      thrown = error;
+    }
+    assert(thrown, 'opening without the key fails');
+    const reopened = await openSyncKey(peekSnapshot(sealed).lock, 'correct horse battery');
+    const back = await unpackSnapshot(sealed, { key: reopened });
+    assert(Object.values(back.records).some((r) => r.title === 'Secret plan'));
+    let wrong = null;
+    try {
+      await openSyncKey(peekSnapshot(sealed).lock, 'wrong passphrase');
+    } catch (error) {
+      wrong = error;
+    }
+    assert(wrong instanceof WrongPasscodeError);
+  });
+
+  it('refuses files that aren’t a copy, and ignores records it doesn’t know', async () => {
+    let thrown = 0;
+    for (const text of ['nope', '{"format":"other"}', '{"format":"notes-sync","version":99}']) {
+      try {
+        peekSnapshot(text);
+      } catch {
+        thrown += 1;
+      }
+    }
+    equal(thrown, 3);
+    const copy = await unpackSnapshot(JSON.stringify({
+      format: 'notes-sync', version: 1, data: { records: { 'notes:a': { id: 'a', title: 'x' }, 'meta:lock': { id: 'lock' }, 'weird:b': { id: 'b' }, 'notes:c': { id: 'other' } }, deleted: { 'notes:z': 5, 'notes:y': 'bad' } },
+    }));
+    equal(Object.keys(copy.records), ['notes:a']);
+    equal(copy.deleted, { 'notes:z': 5 });
+  });
+
+  it('knows the latest change in a copy', () => {
+    equal(latestChange({ records: { a: { syncAt: 5 }, b: { updated: 9 } }, deleted: { c: 7 } }), 9);
+    equal(stampOf({ created: 3 }), 3);
   });
 });
 

@@ -1,2 +1,12 @@
 # Files the Mac makes on its own. The app doesn't need them.
 .DS_Store
+
+# Backups and exports hold your notes, so they must never be published with the app's code.
+# Exports are named after notes and collections, so every file of these kinds is left out,
+# apart from the two the app itself needs.
+*.json
+*.md
+*.zip
+*.ics
+!/README.md
+!/data/defaults.json

@@ -3,6 +3,7 @@
  * Archive, Trash and Settings. Supports drag to reorder and nest. Everything that can be
  * dragged is also available from the "..." menu, for keyboard and touch use.
  */
+import { syncNavItem } from './syncSettings.js';
 import { app } from '../context.js';
 import { RuleError } from '../data/schema.js';
 import { markdownExport } from '../data/porting.js';
@@ -394,6 +395,7 @@ export function createSidebar() {
         h('li', null, h('div', { class: 'nav-row' }, link({ route: 'archive', iconName: 'archive', label: 'Archive', count: counts.archive, focusKey: 'archive' }))),
         h('li', null, h('div', { class: 'nav-row' }, link({ route: 'trash', iconName: 'trash', label: 'Trash', count: counts.trash, focusKey: 'trash' }))),
         h('li', null, h('div', { class: 'nav-row' }, link({ route: 'settings', iconName: 'settings', label: 'Settings', focusKey: 'settings' }))),
+        syncNavItem(),
         db.storage.encrypted && h('li', null, h('div', { class: 'nav-row' },
           h('button', {
             class: 'nav-link nav-button', type: 'button', dataset: { focusKey: 'lock' }, onClick: () => app.lockNow(),

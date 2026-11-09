@@ -9,6 +9,8 @@ import { openDialog } from '../ui/dialog.js';
 import { canInstall, onInstallChange, promptInstall } from '../pwa.js';
 import { calendarConfig } from '../data/googleCalendar.js';
 import { calendarSection } from './calendarSettings.js';
+import { driveConfig } from './driveSync.js';
+import { driveSection } from './syncSettings.js';
 import { lockSection } from './lockSettings.js';
 import { exportAllMarkdown, exportBackup, importBackup } from './transfer.js';
 import { applyTheme } from './theme.js';
@@ -123,6 +125,22 @@ export function settingsView() {
   const stopWatchingInstall = onInstallChange(renderOffline);
 
   const calendar = calendarSection();
+  // What "Your data" says depends on sync and Calendar, so it's redrawn when they're switched.
+  const dataNote = h('div');
+  const drawDataNote = () => fill(dataNote, driveConfig(db).on
+    ? h('div', { class: 'data-warning' },
+      h('p', null, h('strong', null, 'Your notes live in this browser, with a copy in your Google Drive.')),
+      h('p', null, `Sync is on, below. ${driveConfig(db).encrypted ? 'The copy is encrypted with your passphrase, so Google can’t read it.' : 'The copy isn’t encrypted.'} If you lose this device, your notes come back on any device where you turn sync on. Backup files are still worth keeping, in case the copy in Drive is deleted.`))
+    : h('div', { class: 'data-warning' },
+      h('p', null, h('strong', null, 'Your notes live only in this browser, on this device.')),
+      h('p', null, calendarConfig(db).on
+        ? 'Nothing is uploaded except for the tasks you send to Google Calendar, which is on below. There is no account here, and no copy of your notes anywhere else. If you clear your browser data or lose this device, your notes are gone unless you have a backup file.'
+        : 'Nothing is uploaded and there is no account, so nobody else can read them. It also means there is no copy anywhere else. If you clear your browser data or lose this device, your notes are gone unless you have a backup file.')));
+  drawDataNote();
+  const stopDataNote = db.on((change) => {
+    if (change.ids.has('driveSync') || change.ids.has('gcalConfig')) drawDataNote();
+  });
+  const drive = driveSection();
 
   renderLastBackup();
   refreshStorage();
@@ -160,7 +178,7 @@ export function settingsView() {
           h('span', null, 'Notes per space, tasks, journal streak, mood and more'),
           h('a', { class: 'btn', href: '#/stats' }, icon('chart', 16), 'Statistics')),
         h('div', { class: 'settings-row' },
-          h('label', { for: 'private-home' }, 'Show private notes, such as journal entries, on Home. Search has its own switch.'),
+          h('label', { for: 'private-home' }, 'Show private notes, such as journal entries, on the dashboard. Search has its own switch.'),
           h('input', {
             id: 'private-home',
             type: 'checkbox',
@@ -169,14 +187,12 @@ export function settingsView() {
           }))),
 
       section('Your data',
-        h('div', { class: 'data-warning' },
-          h('p', null, h('strong', null, 'Your notes live only in this browser, on this device.')),
-          h('p', null, calendarConfig(db).on
-            ? 'Nothing is uploaded except for the tasks you send to Google Calendar, which is on below. There is no account here, and no copy of your notes anywhere else. If you clear your browser data or lose this device, your notes are gone unless you have a backup file.'
-            : 'Nothing is uploaded and there is no account, so nobody else can read them. It also means there is no copy anywhere else. If you clear your browser data or lose this device, your notes are gone unless you have a backup file.')),
+        dataNote,
         storageInfo),
 
       section('Passcode lock', lockSection()),
+
+      section('Sync with Google Drive', drive.el),
 
       section('Google Calendar', calendar.el),
 
@@ -224,6 +240,8 @@ export function settingsView() {
     destroy: () => {
       stopWatchingInstall();
       calendar.destroy();
+      drive.destroy();
+      stopDataNote();
     },
   };
 }

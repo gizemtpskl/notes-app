@@ -690,3 +690,13 @@ kbd {
   .setup { padding-top: 56px; }
   .setup-list { grid-template-columns: 1fr 1fr; }
 }
+
+/* -- Sync ---------------------------------------------------------------------------- */
+.sync-form .field { max-width: 520px; }
+.sync-pass { flex-wrap: wrap; }
+.sync-pass .field { flex: 1 1 200px; }
+.sync-button.is-signed-out, .sync-button.is-passphrase { color: var(--accent-ink); font-weight: 600; }
+.sync-button.is-error { color: var(--danger); }
+.sync-button.is-syncing svg { animation: sync-turn 1.2s linear infinite; }
+@keyframes sync-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sync-button.is-syncing svg { animation: none; } }
