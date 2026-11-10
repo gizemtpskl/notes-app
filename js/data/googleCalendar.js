@@ -15,6 +15,7 @@
  */
 import { addDays, parseDate } from './dates.js';
 import { fieldValue } from './fieldKinds.js';
+import { readGoogleErrorReason } from './googleErrors.js';
 import { flatten } from './tasks.js';
 import { tasksFields } from './types.js';
 
@@ -263,12 +264,7 @@ export function createCalendarApi(getToken, fetchFn = (...args) => fetch(...args
     });
     if (response.ok) return response.status === 204 ? null : response.json();
     if (response.status === 401) throw new CalendarAuthError('Sign in again.');
-    let reason = '';
-    try {
-      reason = (await response.json()).error?.errors?.[0]?.reason ?? '';
-    } catch {
-      // Not every error comes with a readable body.
-    }
+    const reason = await readGoogleErrorReason(response);
     throw new CalendarError(`Google Calendar answered ${response.status}`, response.status, reason);
   }
 

@@ -27,6 +27,7 @@ import {
   CalendarAuthError, CalendarError, calendarConfig, createCalendarApi, eventBody, eventEntries, eventIdFor, isClientId, planSync, readEvent,
   removeAllEvents, runSync, saveEvents, syncLinks, syncableTasks, toggleEventDone, updateCalendarConfig,
 } from '../data/googleCalendar.js';
+import { googleErrorReason } from '../data/googleErrors.js';
 import { NotesDb } from '../data/db.js';
 import { emptyModel, learn, suggest } from '../data/filing.js';
 import { assetIds, htmlToMarkdown, htmlToText, isBodyEmpty, safeUrl, sanitizeHtml, textToHtml } from '../data/html.js';
@@ -2408,7 +2409,27 @@ describe('Google Calendar', () => {
     } catch (error) {
       thrown = error;
     }
-    equal(thrown.reason, 'accessNotConfigured');
+    equal(thrown.reason, 'apiOff');
+  });
+
+  it('recognises each way Google says an API is off, a box was unticked or a limit was hit', () => {
+    const disabled = {
+      error: {
+        code: 403,
+        message: 'Google Drive API has not been used in project 123456 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=123456 then retry.',
+        errors: [{ message: 'Google Drive API has not been used…', domain: 'usageLimits', reason: 'accessNotConfigured' }],
+        status: 'PERMISSION_DENIED',
+        details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com' }],
+      },
+    };
+    equal(googleErrorReason(disabled), 'apiOff');
+    equal(googleErrorReason({ error: { code: 403, status: 'PERMISSION_DENIED', details: [{ reason: 'SERVICE_DISABLED' }] } }), 'apiOff');
+    equal(googleErrorReason({ error: { code: 403, message: 'Google Calendar API has not been used in project 9 before or it is disabled.' } }), 'apiOff');
+    equal(googleErrorReason({ error: { code: 403, message: 'Request had insufficient authentication scopes.', errors: [{ reason: 'insufficientPermissions' }], details: [{ reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' }] } }), 'scope');
+    equal(googleErrorReason({ error: { code: 403, errors: [{ reason: 'userRateLimitExceeded' }] } }), 'rateLimit');
+    equal(googleErrorReason({ error: { code: 403, errors: [{ reason: 'appNotAuthorizedToFile' }] } }), 'appNotAuthorizedToFile');
+    equal(googleErrorReason({}), '');
+    equal(googleErrorReason(null), '');
   });
 
   it('asks for exactly one local day of events', async () => {

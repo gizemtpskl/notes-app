@@ -45,9 +45,10 @@ const signIn = (clientId) => googleSignIn(clientId, CALENDAR_SCOPE, 'Google Cale
 export { loadGoogleLibrary };
 
 function explain(error) {
-  if (error?.reason === 'accessNotConfigured') return 'The Google Calendar API isn’t turned on in your Google project yet.';
-  if (error?.status === 403) return 'Google refused this. Check that your account is listed as a test user.';
-  if (error?.status === 429) return 'Google asked to slow down. It’ll try again soon.';
+  if (error?.reason === 'apiOff') return 'The Google Calendar API isn’t turned on in your Google project. Turn it on, wait a few minutes, then try again.';
+  if (error?.reason === 'scope') return 'Google Calendar access wasn’t ticked on the Google page. Connect again and tick it.';
+  if (error?.reason === 'rateLimit' || error?.status === 429) return 'Google asked to slow down. It’ll try again soon.';
+  if (error?.status === 403) return 'Google refused this. Check that the Google Calendar API is turned on in your Google project and that your account is a test user.';
   if (error?.status) return 'Google Calendar had a problem. It’ll try again soon.';
   return "Couldn't reach Google Calendar.";
 }

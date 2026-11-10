@@ -16,6 +16,7 @@
 import { app } from '../context.js';
 import { WrongPasscodeError } from '../data/crypto.js';
 import { assetIds } from '../data/html.js';
+import { readGoogleErrorReason } from '../data/googleErrors.js';
 import { cleanRecord } from '../data/porting.js';
 import {
   SNAPSHOT_NAME, KEEP_DELETIONS_DAYS, SyncFileError, createSyncKey, exportKey, importKey, latestChange, mergeSnapshots, openSyncKey,
@@ -87,13 +88,10 @@ async function send(url, options = {}) {
   const response = await fetch(url, { ...options, headers: { Authorization: `Bearer ${googleToken()}`, ...options.headers } });
   if (response.ok) return response;
   if (response.status === 401) throw new DriveAuthError('Sign in again.');
-  let reason = '';
-  try {
-    reason = (await response.json()).error?.errors?.[0]?.reason ?? '';
-  } catch {
-    // Not every error has a readable body.
-  }
-  throw new DriveError(`Google Drive answered ${response.status}`, response.status, reason);
+  const reason = await readGoogleErrorReason(response);
+  const error = new DriveError(`Google Drive answered ${response.status}`, response.status, reason);
+  error.message = explainDrive(error);
+  throw error;
 }
 
 const drive = {
@@ -243,13 +241,20 @@ async function syncOnce() {
   return { changed: Boolean(result?.puts.length || result?.removes.length || needsUpload), received: result ? result.puts.length + result.removes.length : 0 };
 }
 
+/** A plain-English sentence for an answer from Drive that wasn't OK. */
+function explainDrive({ status, reason }) {
+  if (reason === 'apiOff') {
+    return 'The Google Drive API isn’t turned on in your Google project. Turn it on (step 2 of the setup), wait a few minutes, then try again.';
+  }
+  if (reason === 'scope') return 'Google Drive access wasn’t ticked on the Google page. Sign in again and tick it.';
+  if (reason === 'rateLimit' || status === 429) return 'Google asked to slow down. Try again in a minute.';
+  if (status === 403) return 'Google refused this. Check that the Google Drive API is turned on in your Google project and that your account is a test user.';
+  if (status === 413) return 'Your notes are too large to sync in one file (over 5 MB). Large images are the usual cause.';
+  return `Google Drive had a problem (${status}). Try again in a minute.`;
+}
+
 function explain(error) {
-  if (error instanceof SyncFileError || error instanceof NeedPassphraseError) return error.message;
-  if (error?.reason === 'accessNotConfigured') return 'The Google Drive API isn’t turned on in your Google project yet.';
-  if (error?.status === 403) return 'Google refused this. Check that your account is a test user and Drive access was allowed.';
-  if (error?.status === 413) return error.message;
-  if (error?.status === 429) return 'Google asked to slow down. It’ll try again soon.';
-  if (error?.status) return 'Google Drive had a problem. It’ll try again soon.';
+  if (error instanceof DriveError || error instanceof SyncFileError || error instanceof NeedPassphraseError) return error.message;
   return "Couldn't reach Google Drive.";
 }
 
