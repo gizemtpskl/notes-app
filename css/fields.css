@@ -428,3 +428,8 @@
   .task-details { margin-left: 8px; }
   .task-sublist { padding-left: 16px; }
 }
+
+/* -- Your server and Claude ------------------------------------------------------------ */
+.settings-subtitle { margin: 18px 0 6px; font-size: 15px; font-weight: 620; }
+.server-mcp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+.server-mcp-url { min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-raised); font-size: 13px; overflow-wrap: anywhere; }

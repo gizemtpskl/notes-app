@@ -86,9 +86,10 @@ Two built-in note types track applications: **Job application** and **PhD applic
 - There is no copy anywhere else. Clearing your browser data or losing the device loses your notes unless you have a backup. The app reminds you after 14 days without one.
 - **Backups:** Settings has a JSON backup of everything, including images and version history, which can be imported again. Markdown exports (a note, a collection, or everything as a zip) are for reading elsewhere.
 - **Passcode lock (optional):** encrypts everything stored on the device with AES-GCM, using a key protected by your passcode (PBKDF2 with SHA-256, 600,000 rounds). **A forgotten passcode cannot be recovered.** Backup files are not encrypted, so keep them somewhere safe. The lock protects what's stored on the device, for instance from someone reading the browser's files. It doesn't protect against anything running in the browser while the app is unlocked. It needs https or localhost.
+- **Your own server (optional, off by default):** a copy of your notes on a Cloudflare Worker you set up yourself, which syncs your devices and lets Claude use your notes as a connector. That copy is readable, so Claude can work with it, except private notes, which are encrypted with your passphrase on the device first. See [Your own server and Claude](#your-own-server-and-claude).
 - **Google Drive sync (optional, off by default):** a copy of your notes in a hidden folder in your own Google Drive, encrypted with your passphrase if you choose one. See [Sync with Google Drive](#sync-with-google-drive).
 - **Google Calendar (optional, off by default):** when you set it up in **Settings → Google Calendar**, the text, date and time of tasks that have a time, and the name, time, place and reminder of your timetable blocks, go to your main Google calendar, and its events are copied to the Today page and the timetable. Tasks in private notes are never sent. The access token stays in memory only, and the link's data is left out of backups.
-- A strict Content Security Policy blocks injected scripts and every external request except to Google's sign-in, Drive and Calendar addresses, which the app only contacts once sync or Calendar is turned on. Opening a note can never contact another site.
+- A strict Content Security Policy blocks injected scripts and every external request except to Google's sign-in, Drive and Calendar addresses and to `*.workers.dev` (your own server), which the app only contacts once one of them is turned on. Opening a note can never contact another site.
 
 ## How notes are organized
 
@@ -181,14 +182,26 @@ js/
     googleCalendar.js     The optional Google Calendar link
     calendarTimetable.js  Its timetable side: blocks to events, and a week of events to show
     googleErrors.js       Reading Google's error answers
-    sync.js, syncScope.js Merging copies for Google Drive sync, and what syncs
+    sync.js, syncScope.js Merging copies for sync, sealing private notes, and what syncs
     flashcards.js, journal.js, tasks.js, taskText.js, daily.js, picker.js, tidy.js, weekly.js, stats.js, filing.js, dates.js, text.js, zip.js
   editor/               The rich text editor, math and code colors
   ui/                   Small building blocks: elements, dialogs, menus, toasts, icons
   views/                Every page and dialog
+server/                 Your own notes server for sync and Claude: see server/README.md
 ```
 
 `js/data/db.js` explains how the data layer works at the top of the file, and how to add an operation.
+
+## Your own server and Claude
+
+Optional and free. A small server of your own on Cloudflare's free plan, set up once with a few commands: [server/README.md](server/README.md) has every step. Then:
+
+- **Your devices sync through it.** Connect each one in **Settings → Your server and Claude** with the server's address, your access key and a passphrase. It replaces Google Drive sync; connecting turns Drive sync off on that device.
+- **Claude can use your notes.** Add the server to Claude as a custom connector, at the address shown in Settings, and allow it with your access key. Claude can search and read your notes, tasks, deadlines and timetable, and, if you allow it, make notes, change fields and text, add and tick tasks, and add timetable blocks. It can't delete anything, and a note it changes keeps its earlier version in the note's history.
+- **Private notes stay private.** Journal entries and anything you mark private are encrypted with your passphrase before they leave the device. The server stores them sealed, Claude never sees them, and your other devices open them with the same passphrase.
+- **Changes meet in the middle.** As with Drive sync, the newest change to each note wins, and the other is kept in that note's version history. While the app is open it checks the server every minute, so Claude's changes appear within a minute.
+
+The server runs the app's own data code (`js/data`), so Claude's changes follow the same rules as yours: a status that isn't an option is refused, and moving an application to Applied fills in **Applied on**.
 
 ## Sync with Google Drive
 

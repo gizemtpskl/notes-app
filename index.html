@@ -7,7 +7,7 @@
   <meta name="description" content="A private, offline notes app. Everything stays in this browser.">
   <meta name="color-scheme" content="light dark">
   <!-- Enforces the promise of no external requests, and blocks scripts injected through note content. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' https://accounts.google.com/gsi/style; script-src 'self' https://accounts.google.com/gsi/client; connect-src 'self' data: https://www.googleapis.com/drive/ https://www.googleapis.com/upload/drive/ https://www.googleapis.com/calendar/ https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke; frame-src 'self' https://accounts.google.com/gsi/; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' https://accounts.google.com/gsi/style; script-src 'self' https://accounts.google.com/gsi/client; connect-src 'self' data: https://www.googleapis.com/drive/ https://www.googleapis.com/upload/drive/ https://www.googleapis.com/calendar/ https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke https://*.workers.dev; frame-src 'self' https://accounts.google.com/gsi/; base-uri 'none'; form-action 'none'; object-src 'none'">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6f62'/%3E%3Cpath d='M9 10h14M9 16h14M9 22h9' stroke='white' stroke-width='2.500' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">

@@ -9,7 +9,7 @@ import { blocksToIcs, eventToBlock, parseIcs, readDateTime } from '../data/ics.j
 import { INTERVALS, isDue, nextReview, reviewQueue } from '../data/review.js';
 import { dayAgenda, weekAgenda } from '../data/agenda.js';
 import {
-  createSyncKey, latestChange, mergeSnapshots, openSyncKey, packSnapshot, peekSnapshot, snapshotOf, stampOf, unpackSnapshot,
+  createSyncKey, latestChange, mergeSnapshots, openSyncKey, packSnapshot, peekSnapshot, snapshotOf, stampOf, unpackSnapshot, isSealed, normalizeCopy, openSealed, sealPrivate, SyncFileError,
 } from '../data/sync.js';
 import { cleanHabit, createHabit, habitStreak, lastWeek, toggleHabitDay } from '../data/habits.js';
 import {
@@ -1434,6 +1434,70 @@ describe('Your day and your week', () => {
     equal(totals, {
       minutes: 210, blocks: 2, tasks: 2, tasksDone: 1, deadlines: 1,
     });
+  });
+});
+
+describe('Private notes on your own server', () => {
+  const copyWith = () => ({
+    records: {
+      'notes:a': { id: 'a', title: 'Shopping', body: '<p>milk</p>', private: false, syncAt: 5 },
+      'notes:b': { id: 'b', title: 'Dear diary', body: '<p>secret</p>', private: true, syncAt: 7 },
+      'spaces:s': { id: 's', name: 'Home', syncAt: 3 },
+    },
+    deleted: { 'notes:old': 2 },
+  });
+
+  it('seals only private notes, keeping when they changed', async () => {
+    const { key } = await createSyncKey('correct horse');
+    const sealed = await sealPrivate(copyWith(), key);
+    assert(isSealed(sealed.records['notes:b']), 'private: sealed');
+    assert(!isSealed(sealed.records['notes:a']) && !isSealed(sealed.records['spaces:s']), 'the rest: readable');
+    equal(sealed.records['notes:b'].syncAt, 7);
+    assert(!JSON.stringify(sealed).includes('secret') && !JSON.stringify(sealed).includes('diary'), 'nothing readable left');
+    equal(sealed.deleted, { 'notes:old': 2 });
+  });
+
+  it('opens sealed notes with the right key, and refuses another', async () => {
+    const { key } = await createSyncKey('correct horse');
+    const { key: other } = await createSyncKey('wrong horse');
+    const sealed = await sealPrivate(copyWith(), key);
+    const opened = await openSealed(sealed, key);
+    equal(opened.records['notes:b'].title, 'Dear diary');
+    equal(opened.records['notes:a'], copyWith().records['notes:a']);
+    let refused = false;
+    try {
+      await openSealed(sealed, other);
+    } catch (error) {
+      refused = error instanceof SyncFileError;
+    }
+    assert(refused, 'a wrong key is refused');
+    let needsKey = false;
+    try {
+      await openSealed(sealed, null);
+    } catch (error) {
+      needsKey = error instanceof SyncFileError;
+    }
+    assert(needsKey, 'no key: asks for the passphrase');
+  });
+
+  it('a sealed record can\'t take another note\'s place', async () => {
+    const { key } = await createSyncKey('correct horse');
+    const sealed = await sealPrivate(copyWith(), key);
+    const swapped = { records: { 'notes:a': { ...sealed.records['notes:b'], id: 'a' } }, deleted: {} };
+    const opened = await openSealed(swapped, key);
+    equal(opened.records, {});
+  });
+
+  it('checks the shape of a copy from a server', () => {
+    const copy = normalizeCopy({
+      records: {
+        'notes:a': { id: 'a', title: 'ok', updated: 4 }, 'notes:b': { id: 'other' }, 'versions:v': { id: 'v' }, 'meta:secret': { id: 'secret' }, 'meta:settings': { id: 'settings', value: {} },
+      },
+      deleted: { 'notes:x': 3, 'notes:y': 'soon' },
+    });
+    equal(Object.keys(copy.records).sort(), ['meta:settings', 'notes:a']);
+    equal(copy.records['notes:a'].syncAt, 4);
+    equal(copy.deleted, { 'notes:x': 3 });
   });
 });
 

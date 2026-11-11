@@ -191,6 +191,53 @@ export async function unpackSnapshot(text, { key = null } = {}) {
   } catch {
     throw new SyncFileError('This device’s sync key doesn’t open the copy in Google Drive. Turn sync off and on again with your passphrase.');
   }
+  return normalizeCopy(body);
+}
+
+// -- Sealed records ------------------------------------------------------------------------
+// With your own server, the copy there is readable, so Claude can work with it. Private notes are
+// the exception: each one is sealed with the passphrase's key before it leaves the device, as
+// { id, syncAt, sealed }. The server and Claude only see that it exists and when it changed.
+
+export const isSealed = (record) => typeof record?.sealed === 'string';
+
+/** A copy with every private note sealed. */
+export async function sealPrivate(snapshot, key) {
+  const records = {};
+  for (const [name, record] of Object.entries(snapshot.records)) {
+    records[name] = name.startsWith('notes:') && record.private === true
+      ? { id: record.id, syncAt: stampOf(record), sealed: await encryptValue(key, record, { asText: true }) }
+      : record;
+  }
+  return { records, deleted: snapshot.deleted };
+}
+
+/**
+ * Opens the sealed records of a copy. Throws SyncFileError when the key doesn't open them, which
+ * means this device has the wrong passphrase.
+ */
+export async function openSealed(snapshot, key) {
+  const records = {};
+  for (const [name, record] of Object.entries(snapshot.records)) {
+    if (!isSealed(record)) {
+      records[name] = record;
+      continue;
+    }
+    if (!key) throw new SyncFileError('Enter your passphrase to open your private notes.');
+    let opened;
+    try {
+      opened = await decryptValue(key, record.sealed);
+    } catch {
+      throw new SyncFileError('Your passphrase doesn’t open the private notes on your server. Disconnect and connect again with the right one.');
+    }
+    // What's inside decides, except the name: a sealed record can't move into another's place.
+    if (opened?.id === record.id) records[name] = { ...opened, syncAt: record.syncAt };
+  }
+  return { records, deleted: snapshot.deleted };
+}
+
+/** Checks the shape of a copy from elsewhere: only stores and settings that sync, with matching ids. */
+export function normalizeCopy(body) {
   const records = {};
   for (const [key2, raw] of Object.entries(body?.records ?? {})) {
     const [store, id] = splitKey(key2);

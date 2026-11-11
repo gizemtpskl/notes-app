@@ -11,6 +11,8 @@ import { calendarConfig } from '../data/googleCalendar.js';
 import { calendarSection } from './calendarSettings.js';
 import { driveConfig } from './driveSync.js';
 import { driveSection } from './syncSettings.js';
+import { serverSection } from './serverSettings.js';
+import { serverConfig } from './serverSync.js';
 import { lockSection } from './lockSettings.js';
 import { exportAllMarkdown, exportBackup, importBackup } from './transfer.js';
 import { applyTheme } from './theme.js';
@@ -127,7 +129,11 @@ export function settingsView() {
   const calendar = calendarSection();
   // What "Your data" says depends on sync and Calendar, so it's redrawn when they're switched.
   const dataNote = h('div');
-  const drawDataNote = () => fill(dataNote, driveConfig(db).on
+  const drawDataNote = () => fill(dataNote, serverConfig(db).on
+    ? h('div', { class: 'data-warning' },
+      h('p', null, h('strong', null, 'Your notes live in this browser, with a copy on your own server.')),
+      h('p', null, 'Your server is connected, below. Its copy is readable, so Claude can use it when you connect Claude; private notes are encrypted with your passphrase. If you lose this device, your notes come back on any device you connect. Backup files are still worth keeping.'))
+    : driveConfig(db).on
     ? h('div', { class: 'data-warning' },
       h('p', null, h('strong', null, 'Your notes live in this browser, with a copy in your Google Drive.')),
       h('p', null, `Sync is on, below. ${driveConfig(db).encrypted ? 'The copy is encrypted with your passphrase, so Google can’t read it.' : 'The copy isn’t encrypted.'} If you lose this device, your notes come back on any device where you turn sync on. Backup files are still worth keeping, in case the copy in Drive is deleted.`))
@@ -138,9 +144,10 @@ export function settingsView() {
         : 'Nothing is uploaded and there is no account, so nobody else can read them. It also means there is no copy anywhere else. If you clear your browser data or lose this device, your notes are gone unless you have a backup file.')));
   drawDataNote();
   const stopDataNote = db.on((change) => {
-    if (change.ids.has('driveSync') || change.ids.has('gcalConfig')) drawDataNote();
+    if (change.ids.has('driveSync') || change.ids.has('serverSync') || change.ids.has('gcalConfig')) drawDataNote();
   });
   const drive = driveSection();
+  const server = serverSection();
 
   renderLastBackup();
   refreshStorage();
@@ -192,6 +199,8 @@ export function settingsView() {
 
       section('Passcode lock', lockSection()),
 
+      section('Your server and Claude', server.el),
+
       section('Sync with Google Drive', drive.el),
 
       section('Google Calendar', calendar.el),
@@ -241,6 +250,7 @@ export function settingsView() {
       stopWatchingInstall();
       calendar.destroy();
       drive.destroy();
+      server.destroy();
       stopDataNote();
     },
   };

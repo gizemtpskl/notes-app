@@ -19,6 +19,7 @@ import { newNote } from './views/actions.js';
 import { startCalendarSync } from './views/calendarConnection.js';
 import { startReminders } from './views/reminders.js';
 import { startDriveSync } from './views/driveSync.js';
+import { startServerSync } from './views/serverSync.js';
 import { dashboardLayout } from './data/dashboard.js';
 import { openCaptureDialog } from './views/capture.js';
 import { collectionView, notFound, spaceView } from './views/folder.js';
@@ -342,6 +343,7 @@ async function start() {
   startShell();
   startCalendarSync();
   startDriveSync();
+  startServerSync();
   startReminders();
   startAutoLock();
   app.lockNow = lockNow;

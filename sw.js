@@ -96,6 +96,8 @@ const FILES = [
   'js/views/fieldWidgets.js',
   'js/views/filterBar.js',
   'js/views/driveSync.js',
+  'js/views/serverSync.js',
+  'js/views/serverSettings.js',
   'js/views/flashcardsField.js',
   'js/views/folder.js',
   'js/views/gridDrag.js',

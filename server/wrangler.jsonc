@@ -1,0 +1,34 @@
+// Your notes server. See README.md in this folder for setting it up.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "notes-app-server",
+	"main": "src/index.js",
+	"compatibility_date": "2026-10-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "NOTES",
+				"class_name": "NotesStore"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"NotesStore"
+			]
+		}
+	],
+	"kv_namespaces": [
+		// Sign-ins for Claude. Replace the id with the one from: npx wrangler kv namespace create OAUTH_KV
+		{
+			"binding": "OAUTH_KV",
+			"id": "922316c7bfd44fcb95f013284dc224c3",
+			"remote": true
+		}
+	]
+}

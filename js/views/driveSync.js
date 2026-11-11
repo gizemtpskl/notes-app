@@ -140,10 +140,23 @@ const tooBig = (text) => new Blob([text]).size > MAX_FILE_BYTES;
 
 // -- Syncing -------------------------------------------------------------------------------
 
-/** Applies what a merge decided, keeping the times changes were made, and saves lost edits. */
-function applyMerge(result) {
+/**
+ * Applies what a merge decided, keeping the times changes were made, and saves lost edits. With
+ * keepReplaced, a note changed elsewhere (such as by Claude) also keeps its version from here in
+ * its history, so any change can be undone from there.
+ */
+export function applyMerge(result, { keepReplaced = false } = {}) {
   const { db } = app;
   const deletedAt = new Map(result.removes.map((r) => [`${r.store}:${r.id}`, r.at]));
+  if (keepReplaced) {
+    const conflicted = new Set(result.conflicts.filter((c) => c.store === 'notes').map((c) => c.record.id));
+    for (const { store, record } of result.puts) {
+      const previous = store === 'notes' ? db.getNote(record.id) : null;
+      if (previous && !conflicted.has(record.id) && (previous.title !== record.title || previous.body !== record.body || JSON.stringify(previous.fields) !== JSON.stringify(record.fields))) {
+        db.snapshotNote(record.id, previous);
+      }
+    }
+  }
   db.withSyncTimes(() => {
     for (const { store, record } of result.puts) {
       const clean = store === 'meta' ? cleanRecord('meta', record) : cleanRecord(store, record);

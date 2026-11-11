@@ -13,6 +13,7 @@ import {
   turnOnDrive,
 } from './driveSync.js';
 import { loadGoogleLibrary } from './googleAuth.js';
+import { onServerStatus, serverConfig, serverStatus, syncServer } from './serverSync.js';
 
 const MIN_PASSPHRASE = 8;
 
@@ -90,6 +91,10 @@ export function driveSection() {
     const { state, message } = driveStatus();
     const problem = h('p', { class: 'field-error', role: 'alert' }, state === 'error' || state === 'passphrase' ? message : '');
 
+    if (!config.on && serverConfig().on) {
+      fill(el, h('p', { class: 'settings-text' }, 'Off. Your devices sync through your own server, above. To use Google Drive instead, disconnect the server first.'));
+      return;
+    }
     if (!config.on) {
       const clientId = h('input', {
         class: 'input', type: 'text', value: config.clientId || calendarConfig(db).clientId, autocomplete: 'off', spellcheck: 'false', placeholder: '123456-abc.apps.googleusercontent.com',
@@ -186,7 +191,7 @@ export function driveSection() {
   render();
   const stop = onDriveStatus(render);
   const off = db.on((change) => {
-    if ((change.ids.has('driveSync')) && !el.contains(document.activeElement)) render();
+    if ((change.ids.has('driveSync') || change.ids.has('serverSync')) && !el.contains(document.activeElement)) render();
   });
   return { el, destroy: () => { stop(); off(); } };
 }
@@ -233,6 +238,21 @@ export function syncNavItem() {
   if (navItem) return navItem;
   navItem = h('li', { class: 'sync-nav' });
   const render = () => {
+    const server = serverConfig();
+    if (server.on) {
+      const { state, message } = serverStatus();
+      const text = { syncing: 'Syncing…', error: 'Sync problem, try again', idle: syncedText(server.lastSync), off: '' }[state];
+      fill(navItem, h('div', { class: 'nav-row' },
+        h('button', {
+          class: `nav-link nav-button sync-button is-${state}`,
+          type: 'button',
+          dataset: { focusKey: 'sync' },
+          title: state === 'error' ? `${message} Click to try again.` : 'Sync with your server now',
+          onClick: () => syncServer(),
+        }, icon('repeat'), h('span', { class: 'nav-label' }, text),
+        state === 'error' && h('span', { class: 'sr-only' }, `: ${message} Click to try again.`))));
+      return;
+    }
     const config = driveConfig();
     if (!config.on) {
       fill(navItem);
@@ -257,8 +277,9 @@ export function syncNavItem() {
   };
   render();
   onDriveStatus(render);
+  onServerStatus(render);
   app.db.on((change) => {
-    if (change.ids.has('driveSync')) render();
+    if (change.ids.has('driveSync') || change.ids.has('serverSync')) render();
   });
   setInterval(render, 60000);
   return navItem;
