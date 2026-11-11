@@ -3,7 +3,7 @@
  * data/defaults.json, which can be accepted or edited before anything is created.
  */
 import { app } from '../context.js';
-import { SPACE_COLORS } from '../data/schema.js';
+import { SPACE_COLORS, SPACE_COLOR_NAMES } from '../data/schema.js';
 import { h } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { importBackup } from './transfer.js';
@@ -109,7 +109,7 @@ export function runOnboarding() {
           class: 'swatch swatch-cycle',
           type: 'button',
           dataset: { color: space.color },
-          'aria-label': `Change color for ${space.name}. Now ${space.color}`,
+          'aria-label': `Change color for ${space.name}. Now ${SPACE_COLOR_NAMES[space.color] ?? space.color}`,
           title: 'Change color',
           onClick: () => {
             space.color = SPACE_COLORS[(SPACE_COLORS.indexOf(space.color) + 1) % SPACE_COLORS.length];

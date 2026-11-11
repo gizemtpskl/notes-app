@@ -13,7 +13,8 @@
  *
  * LISTENING FOR CHANGES
  *   db.on((change) => ...) fires once per finished batch with:
- *     { stores: Set, ids: Set, structural: boolean, source: 'local' | 'remote' }
+ *     { stores: Set, ids: Set, structural: boolean, source: 'local' | 'remote', synced: boolean }
+ *     synced: written by a sync, so it came from another device even though this tab wrote it
  *   structural is true when something that lists or the sidebar show has changed (a note moved,
  *   was pinned, archived and so on). Typing in a note is not structural.
  *
@@ -26,7 +27,7 @@
  *   tab sync and events then all work with no extra code.
  */
 import {
-  BACKUP_REMINDER_DAYS, BACKUP_SNOOZE_DAYS, DAY_MS, DEFAULT_TYPE_ID, MAX_VERSIONS, MEMORY_STORES,
+  BACKUP_REMINDER_DAYS, BACKUP_SNOOZE_DAYS, DAY_MS, DEFAULT_SPACE_RECOLOR, DEFAULT_TYPE_ID, MAX_VERSIONS, MEMORY_STORES,
   RuleError, TRASH_DAYS, cleanTagName, createCollection, createNote, createSavedView, createSpace, createTag, uid,
 } from './schema.js';
 import { compareValues, fieldValue, isEmptyValue } from './fieldKinds.js';
@@ -37,6 +38,8 @@ import { BUILTIN_TEMPLATES, notePropsFromTemplate, templateFromNote } from './te
 import { fold } from './text.js';
 import { blockProblem, createSemester, createTimeBlock, toMinutes } from './timetable.js';
 import { createHabit, toggleHabitDay } from './habits.js';
+import { createFocusSession } from './focus.js';
+import { cleanGoal } from './wins.js';
 import { syncsRecord } from './syncScope.js';
 import { isDateStr, toDateStr } from './dates.js';
 import {
@@ -115,7 +118,9 @@ export class NotesDb {
   /** Groups writes so listeners fire once and they all land in one storage transaction. */
   batch(fn) {
     this._batchDepth += 1;
-    this._change ??= { stores: new Set(), ids: new Set(), structural: false, source: 'local' };
+    this._change ??= {
+      stores: new Set(), ids: new Set(), structural: false, source: 'local', synced: Boolean(this._syncTimes),
+    };
     try {
       return fn();
     } finally {
@@ -281,7 +286,7 @@ export class NotesDb {
   }
 
   _isStructural(store, previous, next) {
-    if (store === 'meta' || store === 'timeBlocks' || store === 'semesters' || store === 'habits') return false;
+    if (store === 'meta' || store === 'timeBlocks' || store === 'semesters' || store === 'habits' || store === 'focus') return false;
     if (store !== 'notes') return true;
     if (!previous || !next) return true;
     return STRUCTURAL_NOTE_KEYS.some((key) => previous[key] !== next[key]);
@@ -401,6 +406,26 @@ export class NotesDb {
   updateSpace(id, patch, now = Date.now()) {
     const space = this._require('spaces', id);
     return this.batch(() => this._put('spaces', { ...space, ...patch, id, updated: now }));
+  }
+
+  /**
+   * Once: the built-in spaces that still have their old color get their "Peach and sage" one.
+   * A color someone picked themselves stays. Returns how many spaces changed.
+   */
+  recolorDefaultSpaces(now = Date.now()) {
+    if (this.getMeta('spaceColorsV2')) return 0;
+    let changed = 0;
+    this.batch(() => {
+      for (const space of this.listSpaces()) {
+        const [before, after] = Object.hasOwn(DEFAULT_SPACE_RECOLOR, space.name) ? DEFAULT_SPACE_RECOLOR[space.name] : [];
+        if (before && space.color === before) {
+          this.updateSpace(space.id, { color: after }, now);
+          changed += 1;
+        }
+      }
+      this.setMeta('spaceColorsV2', true);
+    });
+    return changed;
   }
 
   /** Moves a space to a position in the sidebar. */
@@ -1202,6 +1227,29 @@ export class NotesDb {
   deleteHabit(id) {
     this._require('habits', id);
     this.batch(() => this._remove('habits', id));
+  }
+
+  // -- Focus sessions --------------------------------------------------------------------
+
+  /** Newest first. */
+  listFocusSessions() {
+    return [...this.data.focus.values()].sort((a, b) => b.start - a.start);
+  }
+
+  /** Logs a finished session. The same id twice is one session, so two open tabs can't count it twice. */
+  addFocusSession(props, now = Date.now()) {
+    if (!Number.isFinite(props?.start) || !(props.minutes >= 1)) throw new RuleError('A focus session needs a start and at least a minute.');
+    return this.batch(() => this._put('focus', createFocusSession({ ...props, now })));
+  }
+
+  deleteFocusSession(id) {
+    this._require('focus', id);
+    this.batch(() => this._remove('focus', id));
+  }
+
+  /** A collection's weekly goal, for types that count something like applications sent. 0 removes it. */
+  setWeeklyGoal(collectionId, goal, now = Date.now()) {
+    return this.updateCollection(collectionId, { weeklyGoal: cleanGoal(goal) }, now);
   }
 
   // -- Templates -------------------------------------------------------------------------

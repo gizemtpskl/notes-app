@@ -19,6 +19,8 @@ import { cleanTemplate } from './templates.js';
 import { cleanType, displayTitle } from './types.js';
 import { cleanSemester, cleanTimeBlock } from './timetable.js';
 import { cleanHabit } from './habits.js';
+import { cleanFocusSession } from './focus.js';
+import { cleanGoal } from './wins.js';
 import { createZip } from './zip.js';
 
 /** Meta entries that travel with a backup. Device-specific state such as backup dates stays behind. */
@@ -98,6 +100,7 @@ function cleanCollection(raw, now) {
       defaultTypeId: isId(raw.defaultTypeId) ? raw.defaultTypeId : DEFAULT_TYPE_ID,
       order: Number.isFinite(raw.order) ? raw.order : 0,
       view,
+      weeklyGoal: cleanGoal(raw.weeklyGoal),
       now,
     }),
     created: asTime(raw.created, now),
@@ -193,6 +196,7 @@ function cleanMeta(raw) {
 
 const CLEANERS = {
   habits: cleanHabit,
+  focus: cleanFocusSession,
   timeBlocks: cleanTimeBlock,
   semesters: cleanSemester,
   spaces: cleanSpace,

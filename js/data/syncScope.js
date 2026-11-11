@@ -7,7 +7,7 @@
  * as the passcode lock, Google sign-in details and what was shown when.
  */
 export const SYNC_STORES = Object.freeze([
-  'spaces', 'collections', 'noteTypes', 'notes', 'tags', 'savedViews', 'templates', 'timeBlocks', 'semesters', 'habits',
+  'spaces', 'collections', 'noteTypes', 'notes', 'tags', 'savedViews', 'templates', 'timeBlocks', 'semesters', 'habits', 'focus',
 ]);
 
 /** The meta records that sync: your settings and what filing has learned. */

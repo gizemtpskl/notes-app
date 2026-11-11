@@ -33,10 +33,20 @@ import {
 } from '../data/calendarTimetable.js';
 import { googleErrorReason } from '../data/googleErrors.js';
 import { NotesDb } from '../data/db.js';
+import {
+  cleanFocusSession, createFocusSession, focusByPlace, focusMinutes, formatMinutes,
+} from '../data/focus.js';
+import {
+  cleanGoal, goalOf, goalProgress, milestones, typeNoun, weekWins,
+} from '../data/wins.js';
+import { SYNC_STORES } from '../data/syncScope.js';
+import { h } from '../ui/dom.js';
 import { emptyModel, learn, suggest } from '../data/filing.js';
 import { assetIds, htmlToMarkdown, htmlToText, isBodyEmpty, safeUrl, sanitizeHtml, textToHtml } from '../data/html.js';
 import { applyImport, buildExport, markdownExport, noteToMarkdown, parseImport } from '../data/porting.js';
-import { DAY_MS, EXPORT_FORMAT, RuleError, SCHEMA_VERSION, isSortKey } from '../data/schema.js';
+import {
+  DAY_MS, EXPORT_FORMAT, RuleError, SCHEMA_VERSION, SPACE_COLORS, SPACE_COLOR_NAMES, isSortKey,
+} from '../data/schema.js';
 import { addDays, addMonths, daysBetween, firstDayOfWeek, isDateStr, monthGrid, relativeDay, toDateStr } from '../data/dates.js';
 import { compareValues, fieldValue, isEmptyValue, normalizeValue, valueToText } from '../data/fieldKinds.js';
 import { averageMood, entryDate, moodSeries, onThisDay, streaks } from '../data/journal.js';
@@ -1811,7 +1821,7 @@ describe('Habits', () => {
 describe('Dashboard layout', () => {
   it('starts in the order the spec gives, with extras switched off', () => {
     const layout = dashboardLayout({});
-    equal(layout.filter((w) => w.on).map((w) => w.id), ['day', 'week', 'journal', 'inbox', 'course', 'habits', 'recent', 'pinned', 'bored', 'watch', 'onThisDay', 'nudge']);
+    equal(layout.filter((w) => w.on).map((w) => w.id), ['day', 'week', 'journal', 'inbox', 'wins', 'course', 'habits', 'recent', 'pinned', 'bored', 'watch', 'onThisDay', 'nudge']);
     equal(layout.filter((w) => !w.on).map((w) => w.id), ['today', 'schedule', 'next7', 'progress', 'favorites', 'views']);
     equal([layout.find((w) => w.id === 'nudge').size, layout.find((w) => w.id === 'week').size], ['wide', 'wide']);
   });
@@ -1827,7 +1837,7 @@ describe('Dashboard layout', () => {
 
   it('keeps an older saved layout, adding new widgets after the ones they follow', () => {
     const layout = dashboardLayout({ homeBlocks: [{ id: 'day', on: true }, { id: 'inbox', on: true }, { id: 'today', on: false }, { id: 'favorites', on: true }, { id: 'gone', on: true }] });
-    equal(layout.slice(0, 6).map((w) => [w.id, w.on]), [['day', true], ['week', true], ['journal', true], ['inbox', true], ['today', false], ['schedule', false]]);
+    equal(layout.slice(0, 7).map((w) => [w.id, w.on]), [['day', true], ['week', true], ['journal', true], ['inbox', true], ['wins', true], ['today', false], ['schedule', false]]);
     assert(layout.find((w) => w.id === 'favorites').on, 'a saved choice wins over the default');
     assert(!layout.some((w) => w.id === 'gone'));
     equal(layout.length, WIDGETS.length);
@@ -4606,6 +4616,161 @@ describe('Tidy up', () => {
     const started = performance.now();
     findDuplicateGroups(db.listNotes(), (id) => db.getType(id));
     assert(performance.now() - started < 1500, `${performance.now() - started} ms`);
+  });
+});
+
+describe('Peach and sage colors', () => {
+  it('offers twelve space colors, each with a name, and keeps the old ones valid', () => {
+    equal(SPACE_COLORS.length, 12);
+    for (const old of ['sage', 'sky', 'plum', 'rose', 'amber', 'clay', 'teal', 'slate']) assert(SPACE_COLORS.includes(old), old);
+    for (const id of SPACE_COLORS) assert(typeof SPACE_COLOR_NAMES[id] === 'string' && SPACE_COLOR_NAMES[id], id);
+  });
+
+  it('gives the built-in spaces their new colors once, and leaves chosen colors alone', async () => {
+    const db = await freshDb();
+    const school = db.createSpace({ name: 'School', icon: '🎓', color: 'sky' });
+    const personal = db.createSpace({ name: 'Personal', icon: '🌱', color: 'rose' });
+    const fun = db.createSpace({ name: 'Fun', icon: '🎈', color: 'plum' });
+    const other = db.createSpace({ name: 'constructor', icon: '📁', color: 'sky' });
+    equal(db.recolorDefaultSpaces(), 2);
+    equal(db.getSpace(school.id).color, 'sage');
+    equal(db.getSpace(personal.id).color, 'rose', 'picked by hand');
+    equal(db.getSpace(fun.id).color, 'amber');
+    equal(db.getSpace(other.id).color, 'sky');
+    db.updateSpace(school.id, { color: 'sky' });
+    equal(db.recolorDefaultSpaces(), 0, 'only once');
+    equal(db.getSpace(school.id).color, 'sky');
+  });
+
+  it('leaves out missing data values instead of writing "undefined"', () => {
+    const el = h('li', { dataset: { id: 'n1', color: undefined, other: null } });
+    equal(el.dataset.id, 'n1');
+    assert(!('color' in el.dataset) && !('other' in el.dataset), 'no stray values');
+  });
+});
+
+describe('Focus sessions', () => {
+  it('keeps sessions to sensible values and drops broken ones', () => {
+    const s = createFocusSession({ start: 1000, minutes: 1000, date: '2026-11-11', label: '  Study  ', collectionId: '' });
+    equal(s.minutes, 240);
+    equal(s.label, 'Study');
+    equal(s.collectionId, null);
+    equal(cleanFocusSession({ id: 'f', start: 1, minutes: 0, date: '2026-11-11' }), null);
+    equal(cleanFocusSession({ id: 'f', start: 1, minutes: 25, date: 'yesterday' }), null);
+    equal(cleanFocusSession({ id: 'f', start: 1, minutes: 25, date: '2026-11-11' }).minutes, 25);
+  });
+
+  it('adds up minutes by date and by place', () => {
+    const sessions = [
+      { date: '2026-11-09', minutes: 25, collectionId: 'c1', spaceId: 's1' },
+      { date: '2026-11-10', minutes: 50, collectionId: 'c1', spaceId: 's1' },
+      { date: '2026-11-10', minutes: 30, collectionId: null, spaceId: 's2' },
+      { date: '2026-11-01', minutes: 90, collectionId: null, spaceId: null },
+    ];
+    equal(focusMinutes(sessions, '2026-11-09', '2026-11-15'), 105);
+    equal(focusByPlace(sessions, '2026-11-09', '2026-11-15'), [{ key: 'collection:c1', minutes: 75 }, { key: 'space:s2', minutes: 30 }]);
+    equal([formatMinutes(45), formatMinutes(60), formatMinutes(85)], ['45 min', '1 h', '1 h 25 min']);
+  });
+
+  it('logs a session once even when two tabs finish it, and syncs and backs it up', async () => {
+    const db = await freshDb();
+    const props = { id: 'f1', start: Date.now(), minutes: 25, date: toDateStr(), label: 'Essay' };
+    db.addFocusSession(props);
+    db.addFocusSession(props);
+    equal(db.listFocusSessions().length, 1);
+    assert(SYNC_STORES.includes('focus'), 'syncs');
+    const copy = await freshDb();
+    await applyImport(copy, parseImport(JSON.stringify(await buildExport(db))).data, 'replace');
+    equal(copy.listFocusSessions()[0].label, 'Essay');
+    let threw = false;
+    try { db.addFocusSession({ start: Date.now(), minutes: 0, date: toDateStr() }); } catch { threw = true; }
+    assert(threw, 'a session needs at least a minute');
+  });
+});
+
+describe('Wins, goals and milestones', () => {
+  const today = toDateStr();
+  async function careerDb() {
+    const db = await freshDb();
+    const space = db.createSpace({ name: 'Career', icon: '💼', color: 'sky' });
+    const jobs = db.createCollection({ name: 'Job applications', spaceId: space.id, defaultTypeId: 'jobApplication' });
+    const send = (title) => {
+      const note = db.createNote({ title, typeId: 'jobApplication', spaceId: space.id, collectionId: jobs.id });
+      db.updateNote(note.id, { fields: { ...note.fields, status: 'Applied' } });
+      return note;
+    };
+    return { db, space, jobs, send };
+  }
+
+  it('knows what each type counts, in plain words', async () => {
+    const db = await freshDb();
+    equal(goalOf(db.getType('jobApplication')).verb, 'sent');
+    equal(goalOf(db.getType('phdApplication')).verb, 'submitted');
+    equal(goalOf(db.getType('free')), null);
+    equal([typeNoun('Job application'), typeNoun('Job application', 3), typeNoun('PhD application', 2)], ['job application', 'job applications', 'PhD applications']);
+    equal([cleanGoal(3), cleanGoal(100), cleanGoal(-2), cleanGoal('x')], [3, 50, 0, 0]);
+  });
+
+  it('counts applications sent this week against the goal', async () => {
+    const { db, jobs, send } = await careerDb();
+    equal(goalProgress(db, db.getCollection(jobs.id), { today }).goal, 0);
+    send('Data scientist');
+    send('ML engineer');
+    db.createNote({ title: 'Still deciding', typeId: 'jobApplication', collectionId: jobs.id, spaceId: jobs.spaceId });
+    db.setWeeklyGoal(jobs.id, 3);
+    const progress = goalProgress(db, db.getCollection(jobs.id), { today });
+    equal([progress.done, progress.goal, progress.verb], [2, 3, 'sent']);
+    equal(goalProgress(db, db.createCollection({ name: 'Ideas', spaceId: jobs.spaceId }), { today }), null, 'nothing to count');
+  });
+
+  it('sums up the week', async () => {
+    const { db, send } = await careerDb();
+    send('Data scientist');
+    db.addFocusSession({ start: Date.now(), minutes: 50, date: today });
+    const list = db.createNote({ title: 'List', typeId: 'checklist', fields: { items: [createTask('Write essay'), createTask('Read paper')] } });
+    db.updateTasks(list.id, 'items', (items) => toggleTask(items, items[0].id, { today }));
+    db.createNote({ typeId: 'journal' });
+    const habit = db.createHabit({ name: 'Stretch' });
+    db.toggleHabit(habit.id, today);
+    const wins = weekWins(db, { today });
+    equal([wins.tasks, wins.focus, wins.journalDays, wins.habitDays], [1, 50, 1, 1]);
+    equal(wins.sent, [{ typeId: 'jobApplication', name: 'Job application', verb: 'sent', count: 1 }]);
+    equal(wins.notes, 2, 'the application and the list; journal entries are left out');
+  });
+
+  it('names each milestone once, with keys that stay the same', async () => {
+    const { db, jobs, send } = await careerDb();
+    equal(milestones(db, { today }), []);
+    send('Data scientist');
+    const first = milestones(db, { today }).map((m) => m.key);
+    assert(first.includes('sent:jobApplication:1'), first.join());
+    equal(milestones(db, { today }).find((m) => m.key === 'sent:jobApplication:1').title, 'First job application sent');
+    db.setWeeklyGoal(jobs.id, 1);
+    assert(milestones(db, { today }).some((m) => m.key.startsWith(`goal:${jobs.id}:`)), 'goal reached');
+    db.addFocusSession({ start: Date.now(), minutes: 60, date: today });
+    assert(milestones(db, { today }).some((m) => m.key === 'focus:1'), 'first hour of focus');
+    equal(milestones(db, { today })[0].kind, 'goal', 'the weekly goal ranks first');
+  });
+
+  it('celebrates a journal streak again only when a new streak gets there', async () => {
+    const db = await freshDb();
+    const write = (date) => db.createNote({ typeId: 'journal', fields: { date } });
+    const day = (n) => addDays(today, n);
+    for (const n of [-8, -7, -6]) write(day(n));
+    for (const n of [-2, -1, 0]) write(day(n));
+    const keys = milestones(db, { today }).filter((m) => m.kind === 'journal').map((m) => m.key);
+    equal(keys, [`journal:3:${day(-2)}`]);
+    equal(milestones(db, { today: day(-6) }).filter((m) => m.kind === 'journal').map((m) => m.key), [`journal:3:${day(-8)}`]);
+  });
+
+  it('calls a day clear only when nothing is due and three or more got done', async () => {
+    const db = await freshDb();
+    const list = db.createNote({ title: 'List', typeId: 'checklist', fields: { items: ['a', 'b', 'c', 'd'].map((t) => createTask(t, { due: today })) } });
+    const tick = (i) => db.updateTasks(list.id, 'items', (items) => toggleTask(items, items[i].id, { today }));
+    tick(0); tick(1); tick(2);
+    assert(!milestones(db, { today }).some((m) => m.kind === 'tasks'), 'one still open');
+    tick(3);
+    equal(milestones(db, { today }).filter((m) => m.kind === 'tasks').map((m) => m.key), [`clear:${today}`]);
   });
 });
 

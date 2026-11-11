@@ -21,6 +21,8 @@ import { flatten } from '../data/tasks.js';
 import { findDuplicateGroups, findEmptyNotes, findStaleNotes } from '../data/tidy.js';
 import { displayTitle, summaryFields, tasksFields } from '../data/types.js';
 import { completedTasks, weekStartOf } from '../data/weekly.js';
+import { formatMinutes } from '../data/focus.js';
+import { typeNoun, weekStartFrom, weekWins } from '../data/wins.js';
 import { scheduleAt, startOfWeek, startsIn } from '../data/timetable.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
@@ -79,7 +81,8 @@ const visible = (db) => {
   return db.listNotes().filter((note) => showPrivate || !note.private);
 };
 
-const noteLink = (db, note, extra) => h('a', { class: 'dash-note', href: `#/note/${encodeURIComponent(note.id)}`, dataset: { id: note.id } },
+const spaceColor = (db, note) => (note.spaceId ? db.getSpace(note.spaceId)?.color : undefined);
+const noteLink = (db, note, extra) => h('a', { class: 'dash-note', href: `#/note/${encodeURIComponent(note.id)}`, dataset: { id: note.id, color: spaceColor(db, note) } },
   h('span', { class: 'dash-note-title' }, displayTitle(note, db.getType(note.typeId)) || 'Untitled'),
   extra && h('span', { class: 'dash-note-meta' }, extra));
 
@@ -239,6 +242,23 @@ export const WIDGET_VIEWS = {
     draw();
     timers.push(setInterval(draw, 60000));
     return card('Schedule', '#/timetable', box);
+  },
+
+  wins({ db, today }) {
+    const wins = weekWins(db, { today, weekStart: weekStartFrom(db.getSettings().weekStart) });
+    const tiles = [
+      wins.tasks > 0 && ['tasks', wins.tasks, `${wins.tasks === 1 ? 'task' : 'tasks'} done`],
+      wins.focus > 0 && ['focus', formatMinutes(wins.focus), 'of focus'],
+      ...wins.sent.map((s) => ['sent', s.count, `${typeNoun(s.name, s.count)} ${s.verb}`]),
+      wins.journalDays > 0 && ['journal', wins.journalDays, `${wins.journalDays === 1 ? 'day' : 'days'} journaled`],
+      wins.habitDays > 0 && ['habits', `${wins.habitDays} of ${wins.habitPossible}`, 'habit check-ins'],
+      wins.notes > 0 && ['notes', wins.notes, `${wins.notes === 1 ? 'note' : 'notes'} written`],
+    ].filter(Boolean);
+    return card('Wins this week', '#/review', tiles.length
+      ? h('ul', { class: 'wins' }, tiles.map(([kind, value, label]) => h('li', { class: `win win-${kind}` },
+        h('span', { class: 'win-value' }, String(value)),
+        h('span', { class: 'win-label' }, label))))
+      : h('p', { class: 'wins-empty' }, 'Finish a task, write in your journal or run a focus session, and it shows up here.'));
   },
 
   journal({ db, today, refresh }) {
@@ -424,7 +444,7 @@ export const WIDGET_VIEWS = {
       state.bored = pick.id;
     }
     return card('Bored? Try this', null,
-      h('a', { class: 'dash-idea', href: `#/note/${encodeURIComponent(pick.id)}` }, displayTitle(pick, type) || 'Untitled'),
+      h('a', { class: 'dash-idea', href: `#/note/${encodeURIComponent(pick.id)}`, dataset: { color: spaceColor(db, pick) } }, displayTitle(pick, type) || 'Untitled'),
       h('div', { class: 'card-fields' }, summaryFields(type).map((field) => fieldDisplay(field, fieldValue(pick, field), { db, compact: true, note: pick }))),
       h('div', { class: 'dash-row dash-another' },
         ideas.length > 1 && h('button', {
@@ -454,7 +474,7 @@ export const WIDGET_VIEWS = {
       state.watch = pick.id;
     }
     return card('Tonight’s watch', null,
-      h('a', { class: 'dash-idea', href: `#/note/${encodeURIComponent(pick.id)}` }, displayTitle(pick, type) || 'Untitled'),
+      h('a', { class: 'dash-idea', href: `#/note/${encodeURIComponent(pick.id)}`, dataset: { color: spaceColor(db, pick) } }, displayTitle(pick, type) || 'Untitled'),
       h('div', { class: 'card-fields' }, summaryFields(type).map((field) => fieldDisplay(field, fieldValue(pick, field), { db, compact: true, note: pick }))),
       candidates.length > 1 && h('div', { class: 'dash-row dash-another dash-watch-another' },
         h('button', {

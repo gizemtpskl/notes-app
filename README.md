@@ -40,7 +40,9 @@ The app opens on the dashboard (or on the Inbox or your last note: **Settings �
 
 - **Your day:** everything for today in one list, in time order: timetable blocks, tasks with and without a time, deadlines and Google Calendar events, with what's on now and next marked. Tasks can be ticked here.
 - **Your week:** Monday to Sunday at a glance, each day with what it holds, and totals for the week: hours on the timetable, tasks done, deadlines, habits and journal days. On a phone it's a strip of days with counts.
-- Then journal check-in, Inbox, course review, habits, continue, pinned notes, "Bored? Try this", tonight's watch, on this day, and tidy-up and backup reminders.
+- Then journal check-in and Inbox.
+- **Wins this week:** what you got done so far this week: tasks done, focus time, applications sent, journal days, habit check-ins and notes written. Only what happened shows.
+- Then course review, habits, continue, pinned notes, "Bored? Try this", tonight's watch, on this day, and tidy-up and backup reminders.
 
 Today's tasks, Schedule, Next 7 days and Weekly progress are also available in **Edit dashboard**. They start switched off, because Your day and Your week cover them. A widget with nothing to show shrinks to an "All clear" line or hides.
 
@@ -49,6 +51,13 @@ Today's tasks, Schedule, Next 7 days and Weekly progress are also available in *
 - **Journal check-in:** one tap sets today's mood or energy, starting today's entry if needed.
 - **Habits:** daily habits you define, ticked from the dashboard, with a streak and the last seven days.
 - **Course review:** flashcards use spaced repetition. A card you get right comes back after 1, 3, 7, 14, then 30 days, and one you miss comes back tomorrow. New cards are due straight away. **Exam prep** has the same **Review** button.
+
+## Staying motivated
+
+- **Celebrations:** reaching a milestone shows a short card with a little confetti. Milestones: a journal streak (3, 7, 14, 30 days and on), a habit streak (7, 21, 30 days and on), everything due done after finishing 3 or more tasks in a day, a weekly goal reached, your first and 5th, 10th… application sent, and hours of focus adding up. Each one is celebrated once, on the device where it happened. No confetti when your device asks for reduced motion. Turn it all off in **Settings → Appearance**.
+- **Weekly goals:** job and PhD application boards have a bar above them, such as **Sent this week: 2 of 3**. Choose **Set a weekly goal**. An application counts in the week its status changed to Applied (or Submitted for a PhD).
+- **Focus timer:** start a focus session from a timetable block (**Start focus**), a note (**⋯ → Start a focus session**) or the command palette. Pick 25, 50 or 90 minutes, or your own. A small timer sits at the bottom of the screen with pause and stop, and keeps going if you reload. When it ends you hear a soft chime, and the time is logged to the block's or note's course and space. Stopping early logs the minutes so far. Your focus time shows in **Statistics**, on the dashboard and on space covers, and syncs between devices.
+- **Space covers:** each space page opens with a cover in the space's colour, its emoji, and a line with its collections, notes and focus time this week.
 
 ## Timetable
 
@@ -79,6 +88,15 @@ Two built-in note types track applications: **Job application** and **PhD applic
 - **Deadlines on Today:** the deadline shows on Today and the dashboard as "Apply: Data analyst · Spotify" until you've applied, and the interview date as "Interview: …" while you're waiting for it or in the interviews. After that they leave on their own, and a missed deadline isn't shown in red any more.
 - **Dates fill themselves in:** moving a job to Applied sets **Applied on** to today, and moving a PhD to Submitted sets **Submitted on**, unless they already have a date.
 - **Your own version:** in **Settings → Note types and custom fields**, **Duplicate to customize** makes a copy you can add fields to or change. The copy keeps the deadlines, the dates that fill in and the starting checklist.
+
+## Colours
+
+The theme is called "Peach and sage": a cream and white base, with coral for the main buttons, progress bars, the open item in the sidebar and a few highlights. Every colour is a variable in [css/theme.css](css/theme.css), once for light and once for dark.
+
+- **Light, dark or auto:** choose in **Settings → Appearance**. Auto follows your device.
+- **Space colours:** each space has a colour, which marks its notes, tags, timetable blocks and dashboard items. Pick one of twelve warm pastels with **Edit space** in the space’s ⋯ menu in the sidebar. School, Personal, Fun and Career start as sage, coral, honey and sky.
+- **Readable:** all text meets WCAG AA (4.5:1) in both themes. Coral, red, green and amber are too light for text on cream, so text uses darker shades of them. Colour never shows a state on its own; an icon or a word goes with it.
+- **Motion:** colours change with a soft 0.2 s fade, which turns off when your device asks for reduced motion.
 
 ## Where your data lives
 
@@ -121,11 +139,13 @@ erDiagram
     SPACE ||--o{ TIMEBLOCK : "colors"
     TIMEBLOCK }o--o| NOTE : "links to"
     HABIT { string id string name string icon number order object done }
+    COLLECTION ||--o{ FOCUSSESSION : "counts focus time"
+    FOCUSSESSION { string id string label number start number minutes date date string blockId string noteId string collectionId string spaceId }
     TIMEBLOCK }o--o| NOTE : "gives a task in it a time"
     TIMEBLOCK ||--o{ NOTE : "has notes for its sessions"
 
     SPACE { string id string name string icon string color number order }
-    COLLECTION { string id string name string spaceId string parentId string defaultTypeId object view number order }
+    COLLECTION { string id string name string spaceId string parentId string defaultTypeId object view number order number weeklyGoal }
     NOTETYPE { string id string name string icon array fields string defaultView boolean builtin }
     NOTE { string id string title html body string spaceId string collectionId string typeId object fields array tagIds array links boolean pinned boolean favorite boolean archived boolean private number trashedAt number created number updated number opened }
     TAG { string id string name }

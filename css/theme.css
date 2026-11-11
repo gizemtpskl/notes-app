@@ -1,58 +1,85 @@
 /*
- * theme.css: design tokens. All colors are defined here, once for light and once for dark.
- * Everything else refers to these variables.
- * Contrast: --text and --text-muted meet WCAG AA on both --bg and --bg-sidebar in both themes.
- * --chart-line is validated for data marks (lightness, chroma, contrast) against each theme's --bg.
+ * theme.css: design tokens, "Peach and sage". All colors are defined here, once for light and
+ * once for dark; everything else refers to these variables and never to a hex value.
+ *
+ * Rules:
+ *   - Coral (--accent) is only for primary buttons, progress bars, the active sidebar item and
+ *     key highlights (today, counts that need attention). The cream and white base carries the rest.
+ *   - Text never uses a fill color. --accent, --danger, --success and --warning are too light
+ *     for text on cream, so each has an -ink partner that meets WCAG AA (4.5:1) on --bg, --sidebar,
+ *     --card and --accent-soft. In dark mode the fill colors are light enough and the inks match them.
+ *   - A space's color tints its notes, tags, timetable blocks and dashboard items: a soft mix for
+ *     backgrounds and the solid color for small markers, always with --text on top.
+ *   - Color never shows state on its own; an icon or a label goes with it.
+ * --chart-line is checked for data marks (lightness, chroma, 3:1 contrast) against each theme's --bg.
  */
 :root {
   color-scheme: light;
 
-  --bg: #fbfaf7;
-  --bg-sidebar: #f3f1eb;
-  --bg-raised: #ffffff;
-  --bg-hover: rgba(60, 52, 36, 0.06);
-  --bg-active: rgba(60, 52, 36, 0.1);
-  --bg-code: #f1efe8;
-  --border: #e4e0d6;
-  --border-strong: #cfcabb;
+  /* The palette */
+  --bg: #fff7f0;
+  --sidebar: #f7e8dc;
+  --card: #ffffff;
+  --text: #3d2c26;
+  --text-muted: #7a645a;
+  --border: #ebd9cb;
+  --accent: #e8805a;
+  --accent-hover: #d96d46;
+  --on-accent: #3d1a0e;
+  --accent-soft: #fbe3d8;
+  --space-school: #8fb996;
+  --space-personal: #e8805a;
+  --space-fun: #f2b94b;
+  --space-career: #7fa7d9;
+  --success: #6fa57a;
+  --warning: #e0a23a;
+  --danger: #d2574e;
+  --radius: 9px;
+  --focus-ring: #b4532f;
 
-  --text: #25231f;
-  --text-muted: #625e55;
-  --text-faint: #6f6b61;
+  /* Derived from the palette */
+  --text-faint: var(--text-muted);
+  --accent-ink: #9e4426;
+  --danger-ink: #a63a33;
+  --danger-hover: #8f2f29;
+  --danger-soft: #f9e1dc;
+  --success-ink: #3e7a4b;
+  --warning-ink: #8a5a12;
+  --warning-soft: #fcefd6;
+  --warning-border: #ecc98a;
+  --star: #b7791f;
+  --on-space: #3d2c26;
+  --border-strong: #d8c0ae;
+  --bg-hover: rgba(122, 70, 40, 0.06);
+  --bg-active: rgba(122, 70, 40, 0.1);
+  --sidebar-hover: rgba(255, 255, 255, 0.6);
+  --bg-code: #f9eee5;
+  --chart-line: #c25a34;
 
-  --accent: #2c6a5e;
-  --accent-hover: #235549;
-  --accent-text: #ffffff;
-  --accent-soft: #e3efea;
-  --accent-ink: #1f5a4e;
+  /* Space colors: twelve warm pastels. The first four are the default spaces' colors. */
+  --c-sage: var(--space-school);
+  --c-coral: var(--space-personal);
+  --c-amber: var(--space-fun);
+  --c-sky: var(--space-career);
+  --c-rose: #e89aab;
+  --c-plum: #b49cd6;
+  --c-peach: #f5b08e;
+  --c-teal: #7fc0b6;
+  --c-clay: #cf9f80;
+  --c-moss: #afbf78;
+  --c-mauve: #cc94b6;
+  --c-slate: #ab9f98;
 
-  --danger: #a93a2c;
-  --danger-hover: #8d2e22;
-  --danger-soft: #f8e7e3;
-  --warning-soft: #f7efd9;
-  --warning-border: #e3d4a5;
-
-  --chart-line: #0f8a72;
-
-  --c-sage: #5d8a5e;
-  --c-sky: #3f7fae;
-  --c-plum: #8a5a9a;
-  --c-rose: #b95a78;
-  --c-amber: #b07d1f;
-  --c-clay: #b4663f;
-  --c-teal: #2f8a86;
-  --c-slate: #68717d;
-
-  --shadow-sm: 0 1px 2px rgba(40, 34, 20, 0.08);
-  --shadow-md: 0 8px 28px rgba(40, 34, 20, 0.16), 0 1px 3px rgba(40, 34, 20, 0.08);
-  --scrim: rgba(35, 32, 25, 0.38);
+  --shadow-sm: 0 1px 2px rgba(80, 45, 25, 0.08);
+  --shadow-md: 0 8px 28px rgba(80, 45, 25, 0.14), 0 1px 3px rgba(80, 45, 25, 0.08);
+  --scrim: rgba(61, 44, 38, 0.38);
+  --transition-colors: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-read: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, "Noto Serif", serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   --radius-sm: 6px;
-  --radius: 9px;
   --radius-lg: 14px;
   --sidebar-width: 272px;
   --content-width: 760px;
@@ -62,41 +89,50 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #1b1c1a;
-  --bg-sidebar: #161715;
-  --bg-raised: #262724;
-  --bg-hover: rgba(240, 235, 220, 0.07);
-  --bg-active: rgba(240, 235, 220, 0.12);
-  --bg-code: #2a2b28;
-  --border: #33342f;
-  --border-strong: #494a43;
+  --bg: #231a17;
+  --sidebar: #1b1311;
+  --card: #2e2320;
+  --text: #fbede3;
+  --text-muted: #c2a99b;
+  --border: #433430;
+  --accent: #f29b7a;
+  --accent-hover: #f7ae92;
+  --on-accent: #2b120a;
+  --accent-soft: #4a2e25;
+  --space-school: #a9d1b0;
+  --space-personal: #f29b7a;
+  --space-fun: #f5c86a;
+  --space-career: #9dbee8;
+  --success: #8fc79a;
+  --warning: #f0bc5e;
+  --danger: #ee857c;
+  --focus-ring: #f7ae92;
 
-  --text: #e9e6dd;
-  --text-muted: #aeaa9e;
-  --text-faint: #a09c90;
+  --accent-ink: #f29b7a;
+  --danger-ink: #ee857c;
+  --danger-hover: #f39a92;
+  --danger-soft: #42231f;
+  --success-ink: #8fc79a;
+  --warning-ink: #f0bc5e;
+  --warning-soft: #3a2c1a;
+  --warning-border: #6a5128;
+  --star: #f5c86a;
+  --on-space: #231a17;
+  --border-strong: #5f4b44;
+  --bg-hover: rgba(251, 237, 227, 0.06);
+  --bg-active: rgba(251, 237, 227, 0.1);
+  --sidebar-hover: rgba(251, 237, 227, 0.06);
+  --bg-code: #382b27;
+  --chart-line: #d9704b;
 
-  --accent: #6fb8a5;
-  --accent-hover: #85c8b6;
-  --accent-text: #10201c;
-  --accent-soft: #24352f;
-  --accent-ink: #8fd0be;
-
-  --danger: #e58a7b;
-  --danger-hover: #efa294;
-  --danger-soft: #3b2622;
-  --warning-soft: #352e1d;
-  --warning-border: #5c4f2c;
-
-  --chart-line: #2fa88c;
-
-  --c-sage: #8fbc8f;
-  --c-sky: #7fb4dc;
-  --c-plum: #c29ad0;
-  --c-rose: #e08ea9;
-  --c-amber: #dcb163;
-  --c-clay: #dd9a78;
-  --c-teal: #6cc4bf;
-  --c-slate: #a3acb8;
+  --c-rose: #f0b2bf;
+  --c-plum: #c8b5e6;
+  --c-peach: #f8c4a9;
+  --c-teal: #9dd3cb;
+  --c-clay: #e0b89c;
+  --c-moss: #c6d396;
+  --c-mauve: #ddaecb;
+  --c-slate: #c4b8b1;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
@@ -107,41 +143,50 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --bg: #1b1c1a;
-    --bg-sidebar: #161715;
-    --bg-raised: #262724;
-    --bg-hover: rgba(240, 235, 220, 0.07);
-    --bg-active: rgba(240, 235, 220, 0.12);
-    --bg-code: #2a2b28;
-    --border: #33342f;
-    --border-strong: #494a43;
+    --bg: #231a17;
+    --sidebar: #1b1311;
+    --card: #2e2320;
+    --text: #fbede3;
+    --text-muted: #c2a99b;
+    --border: #433430;
+    --accent: #f29b7a;
+    --accent-hover: #f7ae92;
+    --on-accent: #2b120a;
+    --accent-soft: #4a2e25;
+    --space-school: #a9d1b0;
+    --space-personal: #f29b7a;
+    --space-fun: #f5c86a;
+    --space-career: #9dbee8;
+    --success: #8fc79a;
+    --warning: #f0bc5e;
+    --danger: #ee857c;
+    --focus-ring: #f7ae92;
 
-    --text: #e9e6dd;
-    --text-muted: #aeaa9e;
-    --text-faint: #a09c90;
+    --accent-ink: #f29b7a;
+    --danger-ink: #ee857c;
+    --danger-hover: #f39a92;
+    --danger-soft: #42231f;
+    --success-ink: #8fc79a;
+    --warning-ink: #f0bc5e;
+    --warning-soft: #3a2c1a;
+    --warning-border: #6a5128;
+    --star: #f5c86a;
+    --on-space: #231a17;
+    --border-strong: #5f4b44;
+    --bg-hover: rgba(251, 237, 227, 0.06);
+    --bg-active: rgba(251, 237, 227, 0.1);
+    --sidebar-hover: rgba(251, 237, 227, 0.06);
+    --bg-code: #382b27;
+    --chart-line: #d9704b;
 
-    --accent: #6fb8a5;
-    --accent-hover: #85c8b6;
-    --accent-text: #10201c;
-    --accent-soft: #24352f;
-    --accent-ink: #8fd0be;
-
-    --danger: #e58a7b;
-    --danger-hover: #efa294;
-    --danger-soft: #3b2622;
-    --warning-soft: #352e1d;
-    --warning-border: #5c4f2c;
-
-    --chart-line: #2fa88c;
-
-    --c-sage: #8fbc8f;
-    --c-sky: #7fb4dc;
-    --c-plum: #c29ad0;
-    --c-rose: #e08ea9;
-    --c-amber: #dcb163;
-    --c-clay: #dd9a78;
-    --c-teal: #6cc4bf;
-    --c-slate: #a3acb8;
+    --c-rose: #f0b2bf;
+    --c-plum: #c8b5e6;
+    --c-peach: #f8c4a9;
+    --c-teal: #9dd3cb;
+    --c-clay: #e0b89c;
+    --c-moss: #c6d396;
+    --c-mauve: #ddaecb;
+    --c-slate: #c4b8b1;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
@@ -151,10 +196,19 @@
 
 /* A space's color is available as --space anywhere inside an element tagged with it. */
 [data-color="sage"] { --space: var(--c-sage); }
-[data-color="sky"] { --space: var(--c-sky); }
-[data-color="plum"] { --space: var(--c-plum); }
-[data-color="rose"] { --space: var(--c-rose); }
+[data-color="coral"] { --space: var(--c-coral); }
 [data-color="amber"] { --space: var(--c-amber); }
-[data-color="clay"] { --space: var(--c-clay); }
+[data-color="sky"] { --space: var(--c-sky); }
+[data-color="rose"] { --space: var(--c-rose); }
+[data-color="plum"] { --space: var(--c-plum); }
+[data-color="peach"] { --space: var(--c-peach); }
 [data-color="teal"] { --space: var(--c-teal); }
+[data-color="clay"] { --space: var(--c-clay); }
+[data-color="moss"] { --space: var(--c-moss); }
+[data-color="mauve"] { --space: var(--c-mauve); }
 [data-color="slate"] { --space: var(--c-slate); }
+
+/* Soft color changes on hover and selection; app.css turns them off for reduced motion. */
+a, button, input, select, textarea, summary, .chip, .card, .note-row, .nav-link, .tt-block, .swatch {
+  transition: var(--transition-colors);
+}

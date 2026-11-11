@@ -11,6 +11,7 @@ import { startOfWeek, weekSummary } from '../data/timetable.js';
 import { loadOccurrences } from './timetable.js';
 import { averageMood, moodSeries, streaks } from '../data/journal.js';
 import { niceScale, notesPerSpace, tasksPerWeek, watchedPerMonth } from '../data/stats.js';
+import { focusByPlace, focusMinutes, formatMinutes } from '../data/focus.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { moodChart, moodTable } from './journal.js';
 import { emptyState } from './noteList.js';
@@ -174,6 +175,25 @@ export function statsPageView() {
     return section('Timetable hours per space', 'this week, Monday to Sunday', spaceBars(rows), h('p', { class: 'field-hint' }, 'In hours.'));
   }
 
+  /** Focus time in the last four weeks, by collection or space. Every value is written beside its bar. */
+  function focusSection(today) {
+    const from = addDays(today, -27);
+    const sessions = db.listFocusSessions();
+    const total = focusMinutes(sessions, from, today);
+    if (!total) return null;
+    const rows = focusByPlace(sessions, from, today).map(({ key, minutes }) => {
+      const [kind, placeId] = key.split(':');
+      const place = kind === 'collection' ? db.getCollection(placeId) : kind === 'space' ? db.getSpace(placeId) : null;
+      const space = kind === 'collection' && place ? db.getSpace(place.spaceId) : place;
+      const label = place ? `${space?.icon ?? ''} ${place.name}`.trim() : 'Not linked to anything';
+      return { label, value: Math.round(minutes / 6) / 10 };
+    });
+    const week = focusMinutes(sessions, addDays(today, -6), today);
+    return section('Focus time', `last 4 weeks, ${formatMinutes(total)} in all`,
+      spaceBars(rows),
+      h('p', { class: 'field-hint' }, `In hours. ${formatMinutes(week)} in the last 7 days. Start a focus session from a timetable block, a note or the command palette.`));
+  }
+
   function refresh() {
     charts.splice(0).forEach((chart) => chart.destroy());
     const today = toDateStr();
@@ -205,6 +225,7 @@ export function statsPageView() {
       allNotes.length > 0 && section('Mood', average === null ? 'last 30 days' : `last 30 days, average ${average.toFixed(1)} of 5`,
         mood ? [mood.el, moodTable(series)] : h('p', { class: 'empty-line' }, 'Pick a mood in your journal entries to see a trend.')),
       timetableSection(today),
+      focusSection(today),
       allNotes.length > 0 && section('Watched per month', 'last 12 months',
         watchChart ? [watchChart.el, tableTwin(watched, ['Month', 'Titles'])] : h('p', { class: 'empty-line' }, 'Mark something Watched in a watchlist to see it here.')));
     // The mood chart needs to be on the page to know its width.

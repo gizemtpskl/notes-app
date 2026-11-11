@@ -25,9 +25,9 @@ const WEEK_STARTS = [
 ];
 
 const THEMES = [
-  { value: 'system', label: 'Match device' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'Auto', title: 'Follows your device' },
 ];
 
 function section(title, ...content) {
@@ -91,14 +91,20 @@ export function settingsView() {
     storageInfo.textContent = parts.join(' ');
   }
 
-  const themeSelect = h('select', {
-    class: 'select',
-    id: 'theme-select',
-    onChange: () => {
-      db.updateSettings({ theme: themeSelect.value });
-      applyTheme(themeSelect.value);
+  // Light, dark or auto: a three-way toggle. Auto follows the device's setting.
+  const themeButtons = THEMES.map((theme) => h('button', {
+    class: 'view-btn',
+    type: 'button',
+    title: theme.title,
+    'aria-pressed': String((db.getSettings().theme || 'system') === theme.value),
+    dataset: { theme: theme.value },
+    onClick: () => {
+      db.updateSettings({ theme: theme.value });
+      applyTheme(theme.value);
+      for (const button of themeButtons) button.setAttribute('aria-pressed', String(button.dataset.theme === theme.value));
     },
-  }, THEMES.map((theme) => h('option', { value: theme.value, selected: db.getSettings().theme === theme.value }, theme.label)));
+  }, theme.label));
+  const themeToggle = h('div', { class: 'view-switcher', role: 'group', 'aria-labelledby': 'theme-label', id: 'theme-toggle' }, themeButtons);
 
   const weekSelect = h('select', {
     class: 'select',
@@ -159,14 +165,22 @@ export function settingsView() {
 
       section('Appearance',
         h('div', { class: 'settings-row' },
-          h('label', { for: 'theme-select' }, 'Theme'),
-          themeSelect),
+          h('span', { id: 'theme-label' }, 'Theme'),
+          themeToggle),
         h('div', { class: 'settings-row' },
           h('label', { for: 'week-select' }, 'Week starts on'),
           weekSelect),
         h('div', { class: 'settings-row' },
           h('label', { for: 'start-select' }, 'Open the app on'),
           startSelect),
+        h('div', { class: 'settings-row' },
+          h('label', { for: 'celebrations' }, 'Celebrate milestones, such as a week of journaling or a weekly goal reached'),
+          h('input', {
+            id: 'celebrations',
+            type: 'checkbox',
+            checked: db.getSettings().celebrations !== false,
+            onChange: (event) => db.updateSettings({ celebrations: event.target.checked }),
+          })),
         h('div', { class: 'settings-row' },
           h('span', null, 'Keyboard shortcuts'),
           h('button', { class: 'btn', type: 'button', onClick: () => app.showShortcuts() }, icon('keyboard', 16), 'Show shortcuts'))),

@@ -2,7 +2,7 @@
  * dialogs.js: shared dialogs for organizing: edit space, edit collection, and "move to".
  */
 import { app } from '../context.js';
-import { SOFT_MAX_SPACES, SPACE_COLORS } from '../data/schema.js';
+import { SOFT_MAX_SPACES, SPACE_COLORS, SPACE_COLOR_NAMES } from '../data/schema.js';
 import { fold, snippet } from '../data/text.js';
 import { displayTitle } from '../data/types.js';
 import { h } from '../ui/dom.js';
@@ -32,7 +32,8 @@ export function colorPicker(selected, onPick) {
       class: 'swatch',
       type: 'button',
       role: 'radio',
-      'aria-label': name,
+      'aria-label': SPACE_COLOR_NAMES[name],
+      title: SPACE_COLOR_NAMES[name],
       'aria-checked': String(name === current),
       dataset: { color: name },
       onClick: () => {

@@ -17,7 +17,7 @@
 import { STORES } from './schema.js';
 
 /** Bump when STORES gains an entry. onupgradeneeded creates whatever is missing. */
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export class IndexedDbAdapter {
   kind = 'indexeddb';

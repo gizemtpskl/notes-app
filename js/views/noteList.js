@@ -41,6 +41,11 @@ export function noteMenuItems(note) {
   ];
 }
 
+/** The color of the space a note lives in, for tinting its row or card. Inbox notes have none. */
+export function spaceColorOf(note) {
+  return note.spaceId ? app.db.getSpace(note.spaceId)?.color : undefined;
+}
+
 /** Small tag labels for rows and cards. */
 export function tagChips(note, limit = 3) {
   const names = (note.tagIds ?? []).map((id) => app.db.getTag(id)?.name).filter(Boolean);
@@ -102,7 +107,7 @@ export function noteList(notes, options = {}) {
       ...summaryFields(type).map((field) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true, note })),
       ...tagChips(note),
     ].filter(Boolean);
-    return h('li', { class: `note-row${selecting && selection.isSelected(note.id) ? ' is-selected' : ''}`, dataset: { id: note.id } },
+    return h('li', { class: `note-row${selecting && selection.isSelected(note.id) ? ' is-selected' : ''}`, dataset: { id: note.id, color: spaceColorOf(note) } },
       selecting && selection.checkbox(note, title || 'Untitled'),
       h('a', {
         class: 'note-link',

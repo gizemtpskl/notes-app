@@ -4,8 +4,8 @@
 
 /* -- Filter ------------------------------------------------------------------------------ */
 
-.filter-toggle.is-on { border-color: var(--accent); color: var(--accent-ink); }
-.filter-badge { min-width: 17px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 650; line-height: 17px; text-align: center; }
+.filter-toggle.is-on { border-color: var(--accent-ink); color: var(--accent-ink); }
+.filter-badge { min-width: 17px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 650; line-height: 17px; text-align: center; }
 .filter-panel {
   display: flex;
   flex-direction: column;
@@ -14,7 +14,7 @@
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--card);
 }
 .filter-panel.is-off, .filter-summary.is-off { display: none; }
 .filter-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
@@ -23,7 +23,7 @@
 .filter-control > .input { flex: 1 1 180px; width: auto; max-width: 360px; }
 .filter-multi { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 .filter-multi .select { max-width: 230px; }
-.chip-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.chip-on { border-color: var(--accent-ink); background: var(--accent-soft); color: var(--accent-ink); }
 .filter-rules { display: flex; flex-direction: column; gap: 6px; }
 .filter-rule { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 6px; border-radius: var(--radius-sm); background: var(--bg-hover); }
 .filter-rule .select { max-width: 180px; }
@@ -59,7 +59,7 @@
 .tag-input { width: 100%; min-height: 24px; padding: 1px 6px; border: 1px solid transparent; border-radius: 999px; background: transparent; font-size: 12px; }
 .tag-input::placeholder { color: var(--text-muted); }
 .tag-input:hover { border-color: var(--border); }
-.tag-input:focus { border-color: var(--accent); outline: 2px solid var(--accent-soft); outline-offset: 0; }
+.tag-input:focus { border-color: var(--focus-ring); outline: 2px solid var(--accent-soft); outline-offset: 0; }
 .tag-suggest {
   position: absolute;
   top: 100%;
@@ -73,7 +73,7 @@
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--card);
   box-shadow: var(--shadow-md);
 }
 .tag-option { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; padding: 4px 8px; border: 0; border-radius: var(--radius-sm); background: none; font-size: 13px; text-align: left; overflow-wrap: anywhere; }
@@ -110,14 +110,14 @@
 .mcal { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .mcal th { padding: 3px 0 6px; color: var(--text-muted); font-size: 12px; font-weight: 500; }
 .mcal abbr { text-decoration: none; }
-.mcal-cell { position: relative; height: 54px; padding: 2px; border: 1px solid var(--border); background: var(--bg-raised); vertical-align: top; }
+.mcal-cell { position: relative; height: 54px; padding: 2px; border: 1px solid var(--border); background: var(--card); vertical-align: top; }
 .mcal-cell.is-outside { background: transparent; }
 .mcal-cell.is-outside .mcal-num { color: var(--text-muted); font-weight: 400; }
-.mcal-cell.is-selected { box-shadow: inset 0 0 0 2px var(--accent); }
+.mcal-cell.is-selected { box-shadow: inset 0 0 0 2px var(--accent-ink); }
 .mcal-day { display: block; width: 100%; padding: 2px 3px; border: 0; border-radius: 4px; background: none; font-size: 12px; text-align: left; }
 .mcal-day:hover { background: var(--bg-hover); }
 .mcal-num { display: inline-block; min-width: 20px; font-weight: 550; line-height: 20px; text-align: center; }
-.is-today .mcal-num { border-radius: 10px; background: var(--accent); color: var(--accent-text); font-weight: 650; }
+.is-today .mcal-num { border-radius: 10px; background: var(--accent); color: var(--on-accent); font-weight: 650; }
 .mcal-notes { display: none; flex-direction: column; gap: 2px; }
 .mcal-note { display: block; overflow: hidden; padding: 0 5px; border-left: 3px solid var(--space, var(--border-strong)); border-radius: 3px; background: var(--bg-hover); font-size: 12px; line-height: 1.5; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
 .mcal-note:hover { background: var(--bg-active); }

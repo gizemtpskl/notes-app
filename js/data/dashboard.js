@@ -10,6 +10,8 @@ export const WIDGETS = Object.freeze([
   { id: 'week', label: 'Your week', size: 'wide' },
   { id: 'journal', label: 'Journal check-in' },
   { id: 'inbox', label: 'Inbox' },
+  // After the first screen, which stays today and the week.
+  { id: 'wins', label: 'Wins this week', size: 'wide' },
   { id: 'today', label: 'Today’s tasks', options: ['collection'], off: true },
   { id: 'schedule', label: 'Today’s schedule', off: true },
   { id: 'next7', label: 'Next 7 days', off: true },

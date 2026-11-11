@@ -3,7 +3,7 @@
     {
       "name": "School",
       "icon": "🎓",
-      "color": "sky",
+      "color": "sage",
       "collections": [
         {
           "name": "DL-FS2026",
@@ -19,7 +19,7 @@
     {
       "name": "Personal",
       "icon": "🌿",
-      "color": "sage",
+      "color": "coral",
       "collections": [
         { "name": "2026 Journal", "defaultTypeId": "journal" },
         { "name": "To-dos", "defaultTypeId": "checklist" },
@@ -29,7 +29,7 @@
     {
       "name": "Fun",
       "icon": "🎬",
-      "color": "plum",
+      "color": "amber",
       "collections": [
         { "name": "Movies to watch", "defaultTypeId": "watchlist" },
         { "name": "When I'm bored", "defaultTypeId": "idea" },
@@ -41,7 +41,7 @@
     {
       "name": "Career",
       "icon": "💼",
-      "color": "amber",
+      "color": "sky",
       "collections": [
         { "name": "Goals", "defaultTypeId": "goal" },
         { "name": "Meetings", "defaultTypeId": "meeting" },

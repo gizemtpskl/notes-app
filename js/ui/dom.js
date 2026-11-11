@@ -16,7 +16,8 @@ export function h(tag, props, ...children) {
       } else if (key === 'class') {
         el.className = value;
       } else if (key === 'dataset') {
-        Object.assign(el.dataset, value);
+        // Missing values are left out instead of becoming the text "undefined".
+        for (const [name, item] of Object.entries(value)) if (item != null) el.dataset[name] = item;
       } else if (key === 'cssVars') {
         for (const [name, v] of Object.entries(value)) el.style.setProperty(name, v);
       } else if (key.startsWith('on') && typeof value === 'function') {

@@ -48,7 +48,7 @@
   font-size: 18px;
   line-height: 1.62;
   overflow-wrap: anywhere;
-  caret-color: var(--accent);
+  caret-color: var(--accent-ink);
 }
 .editor-content > :first-child { margin-top: 0; }
 
@@ -86,8 +86,8 @@
   height: 1.02em;
   border: 1.5px solid var(--border-strong);
   border-radius: 4px;
-  background: var(--bg-raised);
-  color: var(--accent-text);
+  background: var(--card);
+  color: var(--on-accent);
   font-family: var(--font-ui);
   font-size: 0.95em;
   font-weight: 700;
@@ -178,7 +178,7 @@
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--card);
   box-shadow: var(--shadow-md);
 }
 .slash-item {
@@ -221,7 +221,7 @@
   padding: 3px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--card);
   box-shadow: var(--shadow-md);
   font-size: 13px;
 }

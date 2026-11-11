@@ -15,7 +15,7 @@ import { loadOccurrences } from './timetable.js';
 const CHECK_MS = 30000;
 const SHOWN_KEY = 'remindersShown';
 
-function notify(title, body, tag) {
+export function notify(title, body, tag) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const options = { body, tag, icon: 'icons/icon-192.png' };
   // Through the service worker where there is one: some phones only allow it that way.

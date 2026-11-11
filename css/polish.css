@@ -5,10 +5,10 @@
 /* -- Lock screen --------------------------------------------------------------------------- */
 
 .lock { display: flex; align-items: center; justify-content: center; min-height: 100dvh; padding: var(--gutter); }
-.lock-box { display: flex; flex-direction: column; width: min(360px, 100%); padding: 26px 24px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-raised); box-shadow: var(--shadow-sm); }
+.lock-box { display: flex; flex-direction: column; width: min(360px, 100%); padding: 26px 24px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); box-shadow: var(--shadow-sm); }
 .lock-icon { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); }
 .lock-title { margin-bottom: 16px; font-size: 20px; font-weight: 660; text-align: center; }
-.lock-error { margin: -6px 0 10px; color: var(--danger); font-size: 14px; }
+.lock-error { margin: -6px 0 10px; color: var(--danger-ink); font-size: 14px; }
 .lock-error:empty { display: none; }
 .lock-forgot { justify-content: center; margin-top: 14px; }
 .lock-note { margin-top: 10px; }

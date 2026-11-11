@@ -10,6 +10,7 @@ import { displayTitle } from '../data/types.js';
 import { downloadBlob, fill, h } from '../ui/dom.js';
 import { openDialog } from '../ui/dialog.js';
 import { icon } from '../ui/icons.js';
+import { focusTargetForNote, startFocusDialog } from './focus.js';
 import { archiveNotes, locationName, moveNotes, newNote, showError, trashNotes } from './actions.js';
 import { pickDestination, pickNote } from './dialogs.js';
 import { newFromTemplate } from './templatesPage.js';
@@ -76,6 +77,7 @@ function allCommands() {
       }
     });
     add('Writing focus mode', 'focus', () => app.toggleFocus());
+    add('Start a focus session on this note', 'clock', () => startFocusDialog(focusTargetForNote(current, displayTitle(current, db.getType(current.typeId)) || 'Untitled')), 'timer pomodoro');
   } else {
     add('Move note…', 'move', () => moveNoteFlow());
   }
@@ -96,6 +98,7 @@ function allCommands() {
   for (const view of db.listSavedViews()) add(`Go to ${view.name}`, 'bookmark', () => app.navigate(`view/${view.id}`), 'saved view');
   for (const tag of db.listTags()) add(`Go to #${tag.name}`, 'tag', () => app.navigate(`tag/${tag.id}`));
 
+  add('Start a focus session', 'clock', () => startFocusDialog(), 'timer pomodoro');
   if (db.storage.encrypted) add('Lock now', 'lock', () => app.lockNow());
   add('Download backup', 'download', () => exportBackup(), 'export json');
   add('Keyboard shortcuts', 'keyboard', () => app.showShortcuts(), 'help');

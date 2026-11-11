@@ -7,7 +7,7 @@
  */
 import { app } from '../context.js';
 import { addDays, formatDay, toDateStr } from '../data/dates.js';
-import { SPACE_COLORS } from '../data/schema.js';
+import { SPACE_COLORS, SPACE_COLOR_NAMES } from '../data/schema.js';
 import { toggleTask } from '../data/tasks.js';
 import {
   BLOCK_TYPES, REMINDERS, WEEK_RULES, blockProblem, changeFromSeries, conflictsWith, createTimeBlock, occurrencesBetween,
@@ -18,6 +18,7 @@ import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
+import { focusTargetForBlock, startFocusDialog } from './focus.js';
 import { pickDestination, pickNote } from './dialogs.js';
 import { homeForType } from './palette.js';
 import { findTask } from './timetableTools.js';
@@ -289,7 +290,7 @@ export function openBlockDialog({ draft = null, blockId = null, originalDate = n
               },
             },
             h('option', { value: '', selected: !seriesDraft.color }, 'The space’s color'),
-            SPACE_COLORS.map((color) => h('option', { value: color, selected: color === seriesDraft.color }, color[0].toUpperCase() + color.slice(1))))));
+            SPACE_COLORS.map((color) => h('option', { value: color, selected: color === seriesDraft.color }, SPACE_COLOR_NAMES[color])))));
 
         function repeatFields() {
           const box = h('div', { class: 'block-repeat' });
@@ -433,6 +434,14 @@ export function openBlockDialog({ draft = null, blockId = null, originalDate = n
         };
 
         const actions = h('div', { class: 'dialog-actions block-actions' },
+          stored && h('button', {
+            class: 'btn',
+            type: 'button',
+            onClick: () => {
+              close(false);
+              startFocusDialog(focusTargetForBlock(stored));
+            },
+          }, icon('clock', 15), 'Start focus'),
           stored && editingOne && h('button', {
             class: 'btn btn-danger-quiet',
             type: 'button',

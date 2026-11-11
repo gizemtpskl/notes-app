@@ -12,6 +12,7 @@ import { autoTitleFor, displayTitle, isBlankNote, noteWords } from '../data/type
 import { createEditor } from '../editor/editor.js';
 import { downloadBlob, fill, fullDate, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
+import { focusTargetForNote, startFocusDialog } from './focus.js';
 import { openMenu } from '../ui/menu.js';
 import { promptDialog } from '../ui/dialog.js';
 import { archiveNotes, locationName, moveNotes, purgeNotes, restoreNotes, showError, trashNotes, unarchiveNotes, withUndo } from './actions.js';
@@ -354,6 +355,7 @@ export function noteView({ id, isNew }) {
         'aria-haspopup': 'menu',
         dataset: { focusKey: 'more' },
         onClick: (event) => openMenu(event.currentTarget, [
+          !note.trashedAt && { label: 'Start a focus session', icon: 'clock', onSelect: () => startFocusDialog(focusTargetForNote(note, displayTitle(note, type) || 'Untitled')) },
           { label: 'Version history', icon: 'history', onSelect: () => { save(); openHistory(id); } },
           !note.trashedAt && { label: 'Save as template', icon: 'template', onSelect: () => { save(); saveAsTemplateFlow(id); } },
           { label: 'Export as Markdown', icon: 'download', onSelect: exportMarkdown },

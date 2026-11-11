@@ -13,7 +13,7 @@ import { openMenu } from '../ui/menu.js';
 import { pointerDrag } from '../ui/pointerDrag.js';
 import { withUndo } from './actions.js';
 import { fieldDisplay } from './fieldWidgets.js';
-import { noteMenuItems, tagChips } from './noteList.js';
+import { noteMenuItems, spaceColorOf, tagChips } from './noteList.js';
 
 const PAGE_SIZE = 100;
 
@@ -133,7 +133,7 @@ export function cardsView(notes, type, { selection } = {}) {
   const grid = h('div', { class: `card-grid${selecting ? ' is-selecting' : ''}` });
   const more = paged(notes, grid, (note) => {
     const noteType = app.db.getType(note.typeId);
-    return h('article', { class: `card${selecting && selection.isSelected(note.id) ? ' is-selected' : ''}`, dataset: { id: note.id } },
+    return h('article', { class: `card${selecting && selection.isSelected(note.id) ? ' is-selected' : ''}`, dataset: { id: note.id, color: spaceColorOf(note) } },
       selecting && selection.checkbox(note, titleOf(note)),
       h('a', {
         class: 'card-link',
@@ -184,7 +184,7 @@ export function kanbanView(notes, type, groupField) {
     const grip = h('button', {
       class: 'kanban-grip', type: 'button', tabindex: '-1', 'aria-hidden': 'true', title: 'Drag to another column',
     }, icon('grip', 14));
-    const element = h('article', { class: 'kanban-card', dataset: { id: note.id } },
+    const element = h('article', { class: 'kanban-card', dataset: { id: note.id, color: spaceColorOf(note) } },
       grip,
       h('a', {
         class: 'kanban-link',

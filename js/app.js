@@ -20,6 +20,8 @@ import { startCalendarSync } from './views/calendarConnection.js';
 import { startReminders } from './views/reminders.js';
 import { startDriveSync } from './views/driveSync.js';
 import { startServerSync } from './views/serverSync.js';
+import { startCelebrations } from './views/celebrate.js';
+import { startFocusTimer } from './views/focus.js';
 import { dashboardLayout } from './data/dashboard.js';
 import { openCaptureDialog } from './views/capture.js';
 import { collectionView, notFound, spaceView } from './views/folder.js';
@@ -318,6 +320,7 @@ async function start() {
   });
 
   applyTheme(db.getSettings().theme);
+  db.recolorDefaultSpaces();
 
   // Asks the browser not to clear this data under storage pressure. Some browsers decide silently.
   navigator.storage?.persist?.().catch(() => {});
@@ -344,6 +347,8 @@ async function start() {
   startCalendarSync();
   startDriveSync();
   startServerSync();
+  startCelebrations();
+  startFocusTimer();
   startReminders();
   startAutoLock();
   app.lockNow = lockNow;

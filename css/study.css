@@ -58,7 +58,7 @@
 .card-term { flex: 1 1 130px; width: auto; font-weight: 550; }
 .card-def { flex: 2 1 190px; width: auto; }
 .card-row .icon-btn { width: 30px; height: 30px; }
-.card-flag.is-on { color: var(--danger); }
+.card-flag.is-on { color: var(--danger-ink); }
 
 /* -- Quiz -------------------------------------------------------------------------------------- */
 
@@ -90,22 +90,22 @@
 .exam-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 18px; }
 .exam-only { min-height: 30px; font-size: 13px; }
 .exam-table td:first-child { min-width: 130px; }
-.exam-flag { display: inline-flex; margin-right: 5px; color: var(--danger); vertical-align: -2px; }
+.exam-flag { display: inline-flex; margin-right: 5px; color: var(--danger-ink); vertical-align: -2px; }
 .exam-table tr.is-review td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 .btn-surprise { min-height: 44px; padding: 8px 20px; font-size: 16px; }
 
 /* -- Weekly review ----------------------------------------------------------------------------- */
 
-.review-step-card { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
+.review-step-card { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
 .review-step-card.is-clear { background: transparent; }
 .review-step-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; font-weight: 620; }
 .review-step-mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 20px; height: 20px; border: 1.5px solid var(--border-strong); border-radius: 50%; }
-.is-clear .review-step-mark { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
+.is-clear .review-step-mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
 .review-step-count { padding: 0 7px; border-radius: 9px; background: var(--bg-active); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .review-step-card .empty-line { padding: 0; }
 .done-list { display: flex; flex-direction: column; }
 .done-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 5px 0; border-bottom: 1px solid var(--border); }
-.done-list svg { flex: none; color: var(--accent-ink); align-self: center; }
+.done-list svg { flex: none; color: var(--success-ink); align-self: center; }
 .done-text { min-width: 0; overflow-wrap: anywhere; }
 .done-list .task-source { display: inline; margin-left: auto; }
 .review-finish { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 18px; }
@@ -117,10 +117,10 @@
 .tidy-section { margin-bottom: 24px; padding-bottom: 6px; }
 .tidy-section .section-head { margin-bottom: 2px; }
 .tidy-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 620; }
-.tidy-check { display: inline-flex; color: var(--accent-ink); }
+.tidy-check { display: inline-flex; color: var(--success-ink); }
 .tidy-section.is-clear .settings-text { margin-bottom: 0; }
 .tidy-groups { display: flex; flex-direction: column; gap: 10px; }
-.tidy-group { padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
+.tidy-group { padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
 .tidy-group .link-rows { border-top: 0; }
 .tidy-group .link-row { padding-right: 0; padding-left: 0; }
 .tidy-group .link-rows li:last-child .link-row { border-bottom: 0; }

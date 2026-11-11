@@ -14,6 +14,7 @@
  *   TimeBlock  a block in the weekly timetable, once or repeating, optionally in a Semester.
  *              See timetable.js for both records and how repeats work.
  *   Habit      a daily habit and the days it was done. See habits.js.
+ *   FocusSession  time spent with the focus timer. See focus.js.
  *
  * The four organizing layers stay independent:
  *   1. Space       broad area of life. A note has exactly one, or none while in the Inbox.
@@ -39,14 +40,26 @@ export const EXPORT_FORMAT = 'personal-notes-export';
 /** All persisted stores. Every record has a string `id`. */
 export const STORES = Object.freeze([
   'meta', 'spaces', 'collections', 'noteTypes', 'notes', 'tags', 'savedViews', 'templates', 'assets', 'versions',
-  'timeBlocks', 'semesters', 'habits',
+  'timeBlocks', 'semesters', 'habits', 'focus',
 ]);
 
 /** Images and old versions of notes can be large, so they are read on demand instead of being kept in memory. */
 export const MEMORY_STORES = Object.freeze(STORES.filter((s) => s !== 'assets' && s !== 'versions'));
 
-/** Named so the theme can give each one a tuned value for light and dark mode. */
-export const SPACE_COLORS = Object.freeze(['sage', 'sky', 'plum', 'rose', 'amber', 'clay', 'teal', 'slate']);
+/**
+ * Twelve warm pastels, named so the theme can give each one a tuned value for light and dark mode.
+ * The ids stay as they are once saved; SPACE_COLOR_NAMES is what people see.
+ */
+export const SPACE_COLORS = Object.freeze(['sage', 'coral', 'amber', 'sky', 'rose', 'plum', 'peach', 'teal', 'clay', 'moss', 'mauve', 'slate']);
+export const SPACE_COLOR_NAMES = Object.freeze({
+  sage: 'Sage', coral: 'Coral', amber: 'Honey', sky: 'Sky', rose: 'Rose', plum: 'Lavender',
+  peach: 'Peach', teal: 'Seafoam', clay: 'Clay', moss: 'Moss', mauve: 'Mauve', slate: 'Stone',
+});
+
+/** The built-in spaces' colors before "Peach and sage", and what they are now. */
+export const DEFAULT_SPACE_RECOLOR = Object.freeze({
+  School: ['sky', 'sage'], Personal: ['sage', 'coral'], Fun: ['plum', 'amber'], Career: ['amber', 'sky'],
+});
 
 export const SOFT_MAX_SPACES = 8;
 export const TRASH_DAYS = 30;
@@ -75,11 +88,11 @@ export function createSpace({ id = uid(), name, icon = '📁', color = 'slate', 
 
 export function createCollection({
   id = uid(), name, spaceId, parentId = null, icon = '', defaultTypeId = DEFAULT_TYPE_ID,
-  order = 0, view = { sort: 'updated', dir: 'desc' }, now = Date.now(),
+  order = 0, view = { sort: 'updated', dir: 'desc' }, weeklyGoal = 0, now = Date.now(),
 }) {
   return {
     id, name: String(name ?? '').trim() || 'Untitled collection', spaceId, parentId, icon,
-    defaultTypeId, order, view, created: now, updated: now,
+    defaultTypeId, order, view, weeklyGoal, created: now, updated: now,
   };
 }
 

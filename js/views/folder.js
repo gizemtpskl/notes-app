@@ -7,7 +7,11 @@
  */
 import { app } from '../context.js';
 import { emptyFilter } from '../data/filters.js';
+import { addDays, toDateStr } from '../data/dates.js';
+import { focusMinutes, formatMinutes } from '../data/focus.js';
 import { tasksFields, viewsFor } from '../data/types.js';
+import { MAX_WEEKLY_GOAL, goalProgress, weekStartFrom } from '../data/wins.js';
+import { openDialog } from '../ui/dialog.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { openMenu } from '../ui/menu.js';
@@ -21,6 +25,7 @@ import { notesPresenter, sortSelect } from './presenter.js';
 import { saveFilterAsView } from './savedViews.js';
 import { createSelection } from './selection.js';
 import { tasksAgendaView } from './tasksAgenda.js';
+import { progressBar } from './tasksField.js';
 import { pickTemplateDialog } from './templatesPage.js';
 
 function collectionCard(col) {
@@ -61,12 +66,26 @@ function newNoteButtons(target, type) {
     }, icon('chevronDown', 14)));
 }
 
+/** One line under a space's name: "3 collections · 12 notes · 1 h 20 min of focus this week". */
+function spaceSummary(db, id) {
+  const collections = db.allCollections().filter((c) => c.spaceId === id).length;
+  const notes = db.listNotes({ spaceId: id }).length;
+  const from = addDays(toDateStr(), -6);
+  const focus = focusMinutes(db.listFocusSessions().filter((s) => s.spaceId === id), from, toDateStr());
+  return [
+    collections && plural(collections, 'collection'),
+    plural(notes, 'note'),
+    focus > 0 && `${formatMinutes(focus)} of focus in the last 7 days`,
+  ].filter(Boolean).join(' · ');
+}
+
 export function spaceView({ id }) {
   const { db } = app;
   const space = db.getSpace(id);
   if (!space) return notFound('This space no longer exists.');
 
   const body = h('div');
+  const coverStats = h('p', { class: 'space-cover-stats' });
   const uiKey = `spaceSort:${id}`;
   const freeType = db.getType('free');
   const rootNotes = () => {
@@ -82,6 +101,7 @@ export function spaceView({ id }) {
     const sort = db.getMeta('ui', {})[uiKey] ?? { sort: 'updated', dir: 'desc' };
     const notes = rootNotes();
     const isEmpty = !collections.length && !notes.length;
+    coverStats.textContent = spaceSummary(db, id);
     fill(body,
       collections.length > 0 && h('section', { class: 'section' },
         h('h2', { class: 'section-title' }, 'Collections'),
@@ -114,16 +134,20 @@ export function spaceView({ id }) {
   return {
     title: space.name,
     el: h('div', { class: 'page', dataset: { color: space.color } },
-      h('header', { class: 'page-head' },
-        h('div', { class: 'page-title-row' },
-          h('h1', { class: 'page-title', tabindex: '-1' }, h('span', { class: 'page-emoji', 'aria-hidden': 'true' }, space.icon), space.name),
-          h('div', { class: 'page-actions' },
-            h('button', { class: 'btn', type: 'button', onClick: () => editCollectionDialog({ spaceId: id }) }, icon('folder', 16), 'New collection'),
-            newNoteButtons({ spaceId: id }, freeType)))),
+      h('header', { class: 'page-head space-cover' },
+        h('div', { class: 'space-cover-band', 'aria-hidden': 'true' }),
+        h('span', { class: 'space-cover-emoji', 'aria-hidden': 'true' }, space.icon || '📁'),
+        h('div', { class: 'space-cover-head' },
+          h('div', { class: 'page-title-row' },
+            h('h1', { class: 'page-title', tabindex: '-1' }, space.name),
+            h('div', { class: 'page-actions' },
+              h('button', { class: 'btn', type: 'button', onClick: () => editCollectionDialog({ spaceId: id }) }, icon('folder', 16), 'New collection'),
+              newNoteButtons({ spaceId: id }, freeType))),
+          coverStats)),
       body,
       selection.bar),
     update: (change) => {
-      if (change.structural || change.stores.has('notes')) {
+      if (change.structural || change.stores.has('notes') || change.stores.has('focus')) {
         refresh();
         selection.prune();
       }
@@ -138,6 +162,57 @@ export function spaceView({ id }) {
   };
 }
 
+const capitalize = (word) => word.charAt(0).toUpperCase() + word.slice(1);
+
+/** Asks for a collection's weekly goal. Resolves with the number, 0 to remove it, or undefined. */
+function weeklyGoalDialog(collection, verb) {
+  return openDialog({
+    title: 'Weekly goal',
+    build: (close) => {
+      const input = h('input', {
+        class: 'input goal-input', type: 'number', min: 1, max: MAX_WEEKLY_GOAL, step: 1, required: true, id: 'goal-input', value: String(collection.weeklyGoal || 3),
+      });
+      return h('form', {
+        onSubmit: (event) => {
+          event.preventDefault();
+          close(Number(input.value));
+        },
+      },
+      h('label', { class: 'field', for: 'goal-input' },
+        h('span', { class: 'field-label' }, `How many ${verb} each week?`),
+        input),
+      h('p', { class: 'field-hint' }, 'Each one counts in the week its status changed. The bar above the list fills up as you go.'),
+      h('div', { class: 'dialog-actions' },
+        collection.weeklyGoal > 0 && h('button', { class: 'btn btn-danger-quiet', type: 'button', onClick: () => close(0) }, 'Remove goal'),
+        h('button', { class: 'btn', type: 'button', onClick: () => close(undefined) }, 'Cancel'),
+        h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save')));
+    },
+  });
+}
+
+/** The weekly goal for collections that count something, like applications sent. */
+function goalBar(db, id) {
+  const collection = db.getCollection(id);
+  const progress = collection && goalProgress(db, collection, { today: toDateStr(), weekStart: weekStartFrom(db.getSettings().weekStart) });
+  if (!progress) return null;
+  const edit = async () => {
+    const goal = await weeklyGoalDialog(db.getCollection(id), progress.verb);
+    if (goal !== undefined) db.setWeeklyGoal(id, goal);
+  };
+  const label = `${capitalize(progress.verb)} this week`;
+  if (!progress.goal) {
+    return h('div', { class: 'goal-bar' },
+      h('span', { class: 'goal-label' }, `${label}: ${progress.done}`),
+      h('button', { class: 'btn btn-small', type: 'button', onClick: edit }, icon('target', 14), 'Set a weekly goal'));
+  }
+  const met = progress.done >= progress.goal;
+  return h('div', { class: `goal-bar${met ? ' is-met' : ''}` },
+    h('span', { class: 'goal-label' }, label),
+    progressBar({ done: progress.done, total: progress.goal, ratio: Math.min(1, progress.done / progress.goal) }, `${label}, goal ${progress.goal}`),
+    met && h('span', { class: 'goal-met' }, icon('check', 14), 'Goal reached'),
+    h('button', { class: 'btn btn-small', type: 'button', onClick: edit }, 'Change goal'));
+}
+
 export function collectionView({ id }) {
   const { db } = app;
   const col = db.getCollection(id);
@@ -148,6 +223,7 @@ export function collectionView({ id }) {
   const target = { collectionId: id };
 
   const childrenEl = h('div');
+  const goalEl = h('div');
 
   function setView(patch) {
     const current = db.getCollection(id);
@@ -210,6 +286,7 @@ export function collectionView({ id }) {
     const current = db.getCollection(id);
     if (!current) return;
     const children = db.listCollections(current.spaceId, id);
+    fill(goalEl, goalBar(db, id));
     fill(childrenEl, children.length > 0 && h('section', { class: 'section' },
       h('h2', { class: 'section-title' }, 'Sub-collections'),
       h('div', { class: 'folder-grid' }, children.map(collectionCard))));
@@ -250,6 +327,7 @@ export function collectionView({ id }) {
               onClick: () => editCollectionDialog({ spaceId: col.spaceId, parentId: id }),
             }, icon('folder', 17)),
             newNoteButtons(target, type)))),
+      goalEl,
       childrenEl,
       presenter.el),
     mounted: presenter.mounted,

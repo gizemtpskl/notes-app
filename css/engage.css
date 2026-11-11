@@ -1,0 +1,149 @@
+/*
+ * engage.css: celebrations, this week's wins, weekly goals, the focus timer and space covers.
+ */
+
+/* -- Celebrations ----------------------------------------------------------------------- */
+
+.celebrations {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 0;
+  left: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--gutter);
+  pointer-events: none;
+}
+.celebration {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 440px;
+  padding: 12px 10px 12px 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  pointer-events: auto;
+  animation: celebration-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.celebration-emoji { flex: none; font-size: 28px; line-height: 1; }
+.celebration-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; margin: 0; }
+.celebration-text strong { font-size: 15px; }
+.celebration-text span { color: var(--text-muted); font-size: 13px; }
+@keyframes celebration-in { from { opacity: 0; transform: translateY(-12px) scale(0.96); } }
+
+.confetti { position: fixed; top: 70px; left: 50%; z-index: 79; width: 0; height: 0; pointer-events: none; }
+.confetti-bit {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--bit);
+  opacity: 0;
+  animation: confetti-fly 1.4s cubic-bezier(0.15, 0.6, 0.4, 1) var(--delay) forwards;
+}
+.confetti-bit:nth-child(3n) { width: 7px; height: 7px; border-radius: 50%; }
+@keyframes confetti-fly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 120px)) rotate(var(--r)); }
+}
+@media (prefers-reduced-motion: reduce) { .confetti { display: none; } }
+
+/* -- This week's wins ------------------------------------------------------------------- */
+
+.wins { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 8px; margin: 4px 0 2px; padding: 0; list-style: none; }
+.win { display: flex; flex-direction: column; gap: 1px; padding: 9px 11px; border-radius: var(--radius); background: color-mix(in srgb, var(--win, var(--accent)) 16%, var(--card)); }
+.win-value { color: var(--text); font-size: 20px; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.win-label { color: var(--text); font-size: 12px; }
+.win-tasks { --win: var(--c-sage); }
+.win-focus { --win: var(--c-sky); }
+.win-journal { --win: var(--c-plum); }
+.win-habits { --win: var(--c-amber); }
+.win-sent { --win: var(--c-coral); }
+.win-notes { --win: var(--c-teal); }
+.wins-empty { margin: 2px 0 0; color: var(--text-muted); font-size: 14px; }
+
+/* -- Weekly goal on a collection --------------------------------------------------------- */
+
+.goal-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 16px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.goal-bar .progress { flex: 1 1 220px; }
+.goal-bar .progress-track { height: 10px; border-radius: 5px; }
+.goal-bar .progress-fill { border-radius: 5px; }
+.goal-label { flex: none; font-weight: 600; }
+.goal-met { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--success-ink); font-weight: 600; }
+.goal-input { width: 76px; }
+
+/* -- Focus timer -------------------------------------------------------------------------- */
+
+.focus-pill {
+  position: fixed;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  left: 14px;
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 100px);
+  padding: 5px 6px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+}
+@media (min-width: 860px) { body:not(.sidebar-hidden):not(.focus-mode) .focus-pill { left: calc(var(--sidebar-width) + 16px); } }
+.focus-pill-ring { flex: none; width: 26px; height: 26px; }
+.focus-pill-ring circle { fill: none; stroke-width: 3.5; }
+.focus-pill-ring .ring-track { stroke: var(--bg-active); }
+.focus-pill-ring .ring-fill { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+.focus-pill-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.focus-pill-time { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.focus-pill-label { overflow: hidden; color: var(--text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.focus-pill.is-paused .focus-pill-time { color: var(--text-muted); }
+.focus-pill .icon-btn { width: 32px; height: 32px; }
+.focus-lengths { display: flex; flex-wrap: wrap; gap: 6px; }
+.focus-today { color: var(--text-muted); font-size: 13px; }
+
+/* -- Space covers -------------------------------------------------------------------------- */
+
+.space-cover { position: relative; margin-bottom: 18px; }
+.space-cover-band {
+  height: 120px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 18% 30%, color-mix(in srgb, var(--space) 55%, transparent) 0 70px, transparent 71px),
+    radial-gradient(circle at 82% 75%, color-mix(in srgb, var(--space) 40%, transparent) 0 90px, transparent 91px),
+    radial-gradient(circle at 55% 10%, color-mix(in srgb, var(--space) 25%, transparent) 0 46px, transparent 47px),
+    linear-gradient(135deg, color-mix(in srgb, var(--space) 34%, var(--card)), color-mix(in srgb, var(--space) 12%, var(--bg)));
+}
+.space-cover-emoji {
+  position: absolute;
+  top: 82px;
+  left: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--space) 30%, var(--card));
+  font-size: 32px;
+}
+.space-cover + .page-title-row, .space-cover ~ .page-title-row { margin-top: 0; }
+.space-cover-head { padding-top: 34px; }
+.space-cover-stats { margin: 4px 0 0; color: var(--text-muted); font-size: 14px; }
+@media (max-width: 560px) {
+  .space-cover-band { height: 90px; }
+  .space-cover-emoji { top: 56px; width: 54px; height: 54px; font-size: 26px; }
+  .space-cover-head { padding-top: 26px; }
+}
+@media print { .space-cover-band, .focus-pill, .celebrations, .confetti { display: none; } .space-cover-emoji { position: static; } }
+
+/* Messages move up while the timer shows, so they never cover its buttons. */
+body.has-focus-pill .toasts { bottom: calc(146px + env(safe-area-inset-bottom)); }
+@media (min-width: 860px) { body.has-focus-pill .toasts { bottom: 76px; } }
