@@ -413,12 +413,14 @@ kbd {
   resize: none;
 }
 .capture-input::placeholder { color: var(--text-faint); }
-.capture-hint { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; color: var(--text-muted); font-size: 12px; }
+.capture-foot { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.capture-hint { display: flex; flex: 1; flex-wrap: wrap; gap: 4px 14px; color: var(--text-muted); font-size: 12px; }
 .capture-hint-wide { display: none; }
+.capture-save { flex: none; }
 
-.capture-field { margin-bottom: 20px; padding: 11px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow-sm); }
+.capture-field { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 20px; padding: 8px 8px 8px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow-sm); }
 .capture-field:focus-within { border-color: var(--focus-ring); outline: 2px solid var(--accent-soft); }
-.capture-field .capture-input { font-size: 15px; }
+.capture-field .capture-input { flex: 1; min-width: 0; align-self: center; font-size: 15px; }
 
 .dialog-picker .dialog-inner { padding-bottom: 8px; }
 .picker-list { max-height: min(380px, 50dvh); margin: 10px -8px 0; overflow-y: auto; }
@@ -565,6 +567,13 @@ kbd {
 .note-crumbs { flex: 1; min-width: 0; padding-top: 7px; }
 .note-crumbs .breadcrumbs { margin: 0; }
 .note-actions { display: flex; flex: none; align-items: center; }
+.note-done { margin-left: 6px; gap: 4px; }
+.note-status { display: inline-flex; flex: none; align-items: center; gap: 3px; min-height: 36px; color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.note-status.is-saved svg { color: var(--success-ink); }
+/* On a phone the bar is full. Done confirms with a message, and screen readers still hear this. */
+@media (max-width: 520px) {
+  .note-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 .note-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 16px; padding: 9px 13px; border: 1px solid var(--warning-border); border-radius: var(--radius); background: var(--warning-soft); font-size: 14px; }
 .note-banner span { flex: 1 1 200px; }
 

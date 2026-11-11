@@ -37,6 +37,7 @@ const SHEET = [
     [['?'], 'This list'],
   ]],
   ['Writing', [
+    [[modName, 'S'], 'Save now (notes also save as you type)'],
     [[modName, 'B'], 'Bold'],
     [[modName, 'I'], 'Italic'],
     [[modName, 'E'], 'Inline code'],

@@ -10,8 +10,9 @@ import { markdownExport } from '../data/porting.js';
 import { fold, snippet } from '../data/text.js';
 import { autoTitleFor, displayTitle, isBlankNote, noteWords } from '../data/types.js';
 import { createEditor } from '../editor/editor.js';
-import { downloadBlob, fill, fullDate, h, plural } from '../ui/dom.js';
+import { downloadBlob, fill, fullDate, h, modKey, modName, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
+import { toast } from '../ui/toast.js';
 import { focusTargetForNote, startFocusDialog } from './focus.js';
 import { openMenu } from '../ui/menu.js';
 import { promptDialog } from '../ui/dialog.js';
@@ -78,7 +79,7 @@ export function noteView({ id, isNew }) {
     clearTimeout(timer);
     timer = null;
     const note = db.getNote(id);
-    if (!dirty || !note) return;
+    if (!dirty || !note) return Promise.resolve();
     dirty = false;
     const title = titleInput.value.trim();
     const body = editor.getHtml();
@@ -98,14 +99,49 @@ export function noteView({ id, isNew }) {
       updateWordCount();
       document.title = `${displayTitle(updated, type) || 'Untitled'} · Notes`;
     }
+    showSaving();
+    return db.flush().then(showSaved);
+  }
+
+  function showSaving() {
+    status.classList.remove('is-saved');
     status.textContent = 'Saving…';
-    db.flush().then(() => {
-      if (!dirty) status.textContent = 'Saved';
-    });
+  }
+
+  function showSaved() {
+    if (dirty) return;
+    status.classList.add('is-saved');
+    status.replaceChildren(icon('check', 14), 'Saved');
+  }
+
+  /** Saving happens as you type. This makes it explicit, for anyone who reaches for a save button. */
+  async function saveNow() {
+    dirty = true;
+    showSaving();
+    await save();
+    showSaved();
+  }
+
+  /** Saves, then goes back to where the note was opened from, or to where it lives. */
+  async function done() {
+    await saveNow();
+    const note = db.getNote(id);
+    const blank = !note || (isNew && isBlankNote(note, type));
+    const back = app.previousPath;
+    if (back && !back.startsWith(`note/${id}`)) history.back();
+    else goToPlace();
+    if (!blank) toast('Saved', { duration: 2000 });
+  }
+
+  function onSaveKey(event) {
+    if (!modKey(event) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') return;
+    event.preventDefault();
+    if (!readOnly) saveNow();
   }
 
   function scheduleSave() {
     dirty = true;
+    status.classList.remove('is-saved');
     status.textContent = '';
     clearTimeout(timer);
     timer = setTimeout(save, savedBody.length > LONG_NOTE_CHARS ? SLOW_SAVE_DELAY_MS : SAVE_DELAY_MS);
@@ -386,11 +422,23 @@ export function noteView({ id, isNew }) {
           },
         ], { label: 'Note actions' }),
       }, icon('more')),
+      !note.trashedAt && h('button', {
+        class: 'btn btn-primary btn-small note-done',
+        type: 'button',
+        title: `Save and go back (${modName} S saves too)`,
+        dataset: { focusKey: 'done' },
+        onClick: done,
+      }, icon('check', 15), 'Done'),
     );
     if (hadFocus) actions.querySelector(`[data-focus-key="${CSS.escape(hadFocus)}"]`)?.focus();
   }
 
   function leaveAfterDelete() {
+    goToPlace();
+  }
+
+  /** The note's collection or space, or the Inbox. */
+  function goToPlace() {
     const note = db.getNote(id);
     if (note?.collectionId) app.navigate(`collection/${note.collectionId}`);
     else if (note?.spaceId) app.navigate(`space/${note.spaceId}`);
@@ -410,7 +458,8 @@ export function noteView({ id, isNew }) {
     editor.toolbar,
     editor.el,
     links.el,
-    h('footer', { class: 'note-foot' }, words, status, created));
+    h('footer', { class: 'note-foot' }, words, created));
+  if (!readOnly) actions.before(status);
 
   const onHide = () => {
     if (document.visibilityState === 'hidden') {
@@ -424,6 +473,7 @@ export function noteView({ id, isNew }) {
   };
   document.addEventListener('visibilitychange', onHide);
   window.addEventListener('pagehide', onPageHide);
+  document.addEventListener('keydown', onSaveKey);
 
   renderChrome();
   updateWordCount();
@@ -481,6 +531,7 @@ export function noteView({ id, isNew }) {
       save();
       document.removeEventListener('visibilitychange', onHide);
       window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('keydown', onSaveKey);
       editor.destroy();
       const note = db.getNote(id);
       if (changedSinceVersion && note) db.snapshotNote(id, note);

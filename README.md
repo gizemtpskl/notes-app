@@ -100,6 +100,7 @@ The theme is called "Peach and sage": a cream and white base, with coral for the
 
 ## Where your data lives
 
+- **Saving:** notes save as you type, and the top of the note says **Saved** once they're on disk. **Done** (or `Ctrl/Cmd+S`) saves straight away; Done also takes you back to where you came from. Quick capture saves with **Save** or `Enter`.
 - Everything is stored in this browser on this device, in IndexedDB. If that's blocked, it falls back to localStorage, and as a last resort to memory, with a warning.
 - There is no copy anywhere else. Clearing your browser data or losing the device loses your notes unless you have a backup. The app reminds you after 14 days without one.
 - **Backups:** Settings has a JSON backup of everything, including images and version history, which can be imported again. Markdown exports (a note, a collection, or everything as a zip) are for reading elsewhere.
@@ -258,6 +259,7 @@ Press `?` anywhere for the full list. The ones used most:
 | Keys | What it does |
 |---|---|
 | `N` | Quick capture to the Inbox. `Ctrl/Cmd+N` too, where the browser allows it. |
+| `Ctrl/Cmd+S` | Save now, in a note (it saves as you type anyway) |
 | `Ctrl/Cmd+K` | Search and commands |
 | `G` then `H`, `O`, `C` or `I` | Go to the Dashboard, Today, Timetable or Inbox |
 | `[[` | Link to another note, while writing |

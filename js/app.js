@@ -174,11 +174,18 @@ function startShell() {
 
   let view = null;
   let viewKey = null;
+  let lastPath = null;
+  /** The page shown before this one, if it was in the app. A note's Done button goes back to it. */
+  app.previousPath = null;
 
   function route(force = false) {
     const path = currentPath();
     const target = resolveRoute(path);
     if (!force && target.key === viewKey && view) return;
+    if (path !== lastPath) {
+      app.previousPath = lastPath;
+      lastPath = path;
+    }
     view?.destroy?.();
     if (path.endsWith('?new')) history.replaceState(null, '', `#/${path.replace('?new', '')}`);
     let built;

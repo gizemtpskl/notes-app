@@ -32,7 +32,7 @@
 /* -- Print ---------------------------------------------------------------------------------- */
 
 @media print {
-  .sidebar, .topbar, .fab, .banners, .toasts, .note-actions, .editor-toolbar, .note-tags .tag-input-wrap, .note-links, .note-foot { display: none !important; }
+  .sidebar, .topbar, .fab, .banners, .toasts, .note-actions, .note-status, .editor-toolbar, .note-tags .tag-input-wrap, .note-links, .note-foot { display: none !important; }
   .app { display: block; height: auto; }
   .main-content, .main { display: block; height: auto; overflow: visible; }
 }

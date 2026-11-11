@@ -89,29 +89,33 @@ export function openCaptureDialog() {
       queueMicrotask(() => autoGrow(area));
       return h('div', { class: 'capture-box' },
         area,
-        h('p', { class: 'capture-hint' },
-          h('span', null, h('kbd', null, 'Enter'), ' save to Inbox'),
-          h('span', null, h('kbd', null, 'Shift'), ' ', h('kbd', null, 'Enter'), ' new line'),
-          h('span', { class: 'capture-hint-wide' }, h('kbd', null, modName), ' ', h('kbd', null, 'Enter'), ' save and open')));
+        h('div', { class: 'capture-foot' },
+          h('p', { class: 'capture-hint' },
+            h('span', null, h('kbd', null, 'Enter'), ' save to Inbox'),
+            h('span', null, h('kbd', null, 'Shift'), ' ', h('kbd', null, 'Enter'), ' new line'),
+            h('span', { class: 'capture-hint-wide' }, h('kbd', null, modName), ' ', h('kbd', null, 'Enter'), ' save and open')),
+          h('button', { class: 'btn btn-primary btn-small capture-save', type: 'button', onClick: () => finish(area, false) }, 'Save')));
     },
   });
 }
 
 /** The same behaviour, inline on a page. */
 export function captureField() {
+  const onSave = (a) => {
+    if (saveCapture(a.value)) {
+      a.value = '';
+      autoGrow(a);
+    }
+  };
   const area = captureArea({
     placeholder: 'Capture a thought and press Enter…',
     label: 'Quick capture to Inbox',
-    onSave: (a) => {
-      if (saveCapture(a.value)) {
-        a.value = '';
-        autoGrow(a);
-      }
-    },
+    onSave,
     onOpen: (a) => {
       const note = saveCapture(a.value);
       if (note) app.navigate(`note/${note.id}`);
     },
   });
-  return h('div', { class: 'capture-field' }, area);
+  return h('div', { class: 'capture-field' }, area,
+    h('button', { class: 'btn btn-primary btn-small capture-save', type: 'button', onClick: () => { onSave(area); area.focus(); } }, 'Save'));
 }
