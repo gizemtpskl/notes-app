@@ -7,7 +7,7 @@
 import { relativeDay, toDateStr } from '../data/dates.js';
 import {
   PRIORITIES, REPEATS, addSubtask, agendaBuckets, createTask, flatten, indentTask, insertTaskAfter, locate,
-  moveRelative, outdentTask, progress, removeTask, shiftTask, toggleTask, updateTask,
+  moveRelative, outdentTask, progress, removeTask, shiftTask, taskTimeLabel, toggleTask, updateTask,
 } from '../data/tasks.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
@@ -35,7 +35,7 @@ export function taskChips(item, today) {
     chips.push(h('span', { class: `chip chip-date${overdue ? ' chip-overdue' : ''}${item.due === today ? ' chip-today' : ''}` },
       overdue && h('span', { class: 'sr-only' }, 'Overdue: '),
       relativeDay(item.due, today),
-      item.time && ` ${item.time}`));
+      item.time && ` ${taskTimeLabel(item)}`));
   }
   if (item.priority) {
     chips.push(h('span', { class: `chip chip-priority chip-priority-${item.priority}` }, icon('flag', 12), PRIORITIES.find((p) => p.value === item.priority).label));

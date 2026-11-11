@@ -30,6 +30,22 @@ export function createTask(text = '', props = {}) {
 }
 
 const isTime = (value) => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+const minutesOf = (clock) => Number(clock.slice(0, 2)) * 60 + Number(clock.slice(3, 5));
+const clockOfMinutes = (total) => `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+
+/** The end a task should have once it starts at `time`, keeping its length; '' when it has none. */
+export function movedEnd(item, time) {
+  if (!item.end || !item.time || !time) return '';
+  const length = minutesOf(item.end) - minutesOf(item.time);
+  const end = minutesOf(time) + length;
+  return length > 0 && end < 24 * 60 ? clockOfMinutes(end) : '';
+}
+
+/** "10:00–11:00", or just "10:00" for a task with no end. */
+export function taskTimeLabel(item) {
+  if (!item.time) return '';
+  return item.end ? `${item.time}–${item.end}` : item.time;
+}
 
 /** Rebuilds a task list from untrusted data. Anything unusable is dropped or reset. */
 export function normalizeTasks(raw, depth = 0, seen = new Set()) {
@@ -52,6 +68,8 @@ export function normalizeTasks(raw, depth = 0, seen = new Set()) {
         repeat: ['daily', 'weekly', 'monthly'].includes(item.repeat) ? item.repeat : null,
         children: depth === 0 ? nested : [],
       };
+      // An end time, from "10:00-11:00": only with a start, and after it.
+      if (task.time && isTime(item.end) && item.end > task.time) task.end = item.end;
       if (Number.isInteger(item.anchorDay)) task.anchorDay = item.anchorDay;
       if (Number.isFinite(item.lastDoneAt)) task.lastDoneAt = item.lastDoneAt;
       if (Array.isArray(item.history)) task.history = item.history.filter(Number.isFinite).slice(-HISTORY_LIMIT);
@@ -88,6 +106,13 @@ export function updateTask(items, id, patch) {
     const next = { ...item, ...patch };
     // A new due date is a new anchor for monthly repeats.
     if ('due' in patch) delete next.anchorDay;
+    // A new start keeps the task's length, unless the change gives an end of its own.
+    if ('time' in patch && !('end' in patch)) {
+      const end = movedEnd(item, next.time);
+      if (end) next.end = end;
+      else delete next.end;
+    }
+    if (!next.end || !next.time || next.end <= next.time) delete next.end;
     return next;
   });
 }

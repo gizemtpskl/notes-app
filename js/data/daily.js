@@ -45,7 +45,9 @@ function listHome(db) {
 export function addDailyTasks(db, drafts, today = toDateStr()) {
   const tasks = drafts
     .filter((draft) => draft.text.trim())
-    .map((draft) => createTask(draft.text.trim(), { due: draft.due || today, time: draft.time ?? '' }));
+    .map((draft) => createTask(draft.text.trim(), {
+      due: draft.due || today, time: draft.time ?? '', ...(draft.time && draft.end > draft.time ? { end: draft.end } : {}),
+    }));
   if (!tasks.length) return tasks;
   const month = today.slice(0, 7);
   db.batch(() => {

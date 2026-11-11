@@ -367,7 +367,7 @@ const yamlString = (value) => JSON.stringify(String(value));
 function tasksToMarkdown(items, indent = '') {
   return items.map((item) => {
     const details = [];
-    if (item.due) details.push(`due ${item.due}${item.time ? ` ${item.time}` : ''}`);
+    if (item.due) details.push(`due ${item.due}${item.time ? ` ${item.time}${item.end ? `–${item.end}` : ''}` : ''}`);
     if (item.priority) details.push(`${PRIORITIES.find((p) => p.value === item.priority).label.toLowerCase()} priority`);
     if (item.repeat) details.push(REPEATS.find((r) => r.value === item.repeat).label.toLowerCase());
     const suffix = details.length ? ` (${details.join(', ')})` : '';

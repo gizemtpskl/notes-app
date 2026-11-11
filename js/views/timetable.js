@@ -81,7 +81,9 @@ export function timedTaskItems(db, from, to, occurrences = []) {
       key: `task:${entry.item.id}`,
       date: entry.item.due,
       start: entry.item.time,
-      end: clockOf(Math.min(toMinutes(entry.item.time) + TASK_MINUTES, 24 * 60 - 1)),
+      // Its own end, from "10:00-11:00", or a short default.
+      end: entry.item.end || clockOf(Math.min(toMinutes(entry.item.time) + TASK_MINUTES, 24 * 60 - 1)),
+      hasEnd: Boolean(entry.item.end),
       title: entry.item.text || 'Task',
       done: Boolean(entry.item.done),
       color: db.getSpace(db.getNote(entry.noteId)?.spaceId)?.color ?? 'slate',
@@ -171,7 +173,7 @@ export function timetableView({ query } = {}) {
   const quickAdd = h('input', {
     class: 'task-add',
     type: 'text',
-    placeholder: 'Add a block, like German Tue 18:15-20:00',
+    placeholder: 'Add a block, like Dentist Thu 10:00-11:00',
     'aria-label': 'Add a block. Days and times in the text are picked up, and you can check them before saving.',
     autocomplete: 'off',
     enterkeyhint: 'done',
@@ -244,7 +246,7 @@ export function timetableView({ query } = {}) {
     const content = [
       h('span', { class: 'tt-block-title' }, t.done && [h('span', { class: 'tt-tag' }, 'Done'), ' '], t.title),
       h('span', { class: 'sr-only' }, `, ${weekdayName(t.date)}`),
-      h('span', { class: 'tt-block-meta' }, ` ${t.start}`, h('span', { class: 'sr-only' }, `, task in ${t.noteTitle}`)),
+      h('span', { class: 'tt-block-meta' }, ` ${t.hasEnd ? `${t.start}–${t.end}` : t.start}`, h('span', { class: 'sr-only' }, `, task in ${t.noteTitle}`)),
     ];
     return h('div', {
       class: `tt-block is-task is-timed-task${short ? ' is-short' : ''}${t.done ? ' is-done' : ''}`, dataset: { key: t.key, color: t.color }, cssVars: positioned,
@@ -450,7 +452,7 @@ export function timetableView({ query } = {}) {
       return emptyState({
         emoji: '🗓️',
         title: 'Nothing this week',
-        text: 'Type a block above, like “German Tue 18:15-20:00”, or use New block.',
+        text: 'Type a block above, like “Dentist Thu 10:00-11:00” or “German every Tue 18:15-20:00”, or use New block.',
       });
     }
     const order = (a, b) => Number(Boolean(b.allDay)) - Number(Boolean(a.allDay)) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
@@ -668,9 +670,11 @@ export function timetableView({ query } = {}) {
 
   // -- Dragging on the grid --------------------------------------------------------------
 
-  /** A task dragged on the grid gets the new day and time. */
+  /** A task dragged on the grid gets the new day and time. Resizing it gives it an end. */
   function moveTask(t, next) {
-    const { undo } = db.undoable(() => db.updateTasks(t.ref.noteId, t.ref.fieldId, (items) => updateTask(items, t.ref.taskId, { due: next.date, time: next.start })));
+    const resized = toMinutes(next.end) - toMinutes(next.start) !== toMinutes(t.end) - toMinutes(t.start);
+    const end = t.hasEnd || resized ? next.end : '';
+    const { undo } = db.undoable(() => db.updateTasks(t.ref.noteId, t.ref.fieldId, (items) => updateTask(items, t.ref.taskId, { due: next.date, time: next.start, end })));
     toast(`Moved to ${formatDay(next.date, { weekday: 'short' })} ${next.start}`, { undo });
   }
 

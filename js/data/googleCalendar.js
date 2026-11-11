@@ -90,7 +90,8 @@ export function syncableTasks(db, skip = new Set()) {
   return tasks;
 }
 
-const fingerprint = (task) => JSON.stringify([task.text, task.due, task.time, task.done]);
+// The end joins only when set, so tasks synced before ends existed aren't all sent again.
+const fingerprint = (task) => JSON.stringify([task.text, task.due, task.time, task.done, ...(task.end ? [task.end] : [])]);
 
 /**
  * What needs doing to bring the calendar up to date: { create, update, remove }. links holds each
@@ -119,7 +120,7 @@ function endOf(due, time) {
 }
 
 export function eventBody(task, timeZone) {
-  const end = endOf(task.due, task.time);
+  const end = task.end > task.time ? { date: task.due, clock: task.end } : endOf(task.due, task.time);
   return {
     summary: `${task.done ? '✓ ' : ''}${task.text || 'Task'}`,
     start: { dateTime: `${task.due}T${task.time}:00`, timeZone },

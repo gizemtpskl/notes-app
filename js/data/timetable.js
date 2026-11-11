@@ -550,9 +550,10 @@ function clock(hours, minutes, half) {
 }
 
 /**
- * Reads text like "German Tue 18:15-20:00" into a draft block:
- * { title, type, date, start, end, repeat, location }. Weekday names make a weekly series, since a
- * timetable is mostly made of those. today is "YYYY-MM-DD".
+ * Reads text like "German every Tue 18:15-20:00" into a draft block:
+ * { title, type, date, start, end, repeat, location }. One day name means the next such day, once.
+ * It repeats only when asked: "every", "each", "weekly", "daily", "weekdays", every other week,
+ * or more than one day. today is "YYYY-MM-DD".
  */
 export function parseBlockText(input, today) {
   let rest = ` ${input.trim()} `;
@@ -598,6 +599,8 @@ export function parseBlockText(input, today) {
     take(rule);
   }
 
+  // Asked for in words. "weekly" stays in the title: "Weekly review Sun" is still a weekly review.
+  let asked = Boolean(rule) || /(?<![\w-])(every|each|weekly)(?![\w-])/i.test(rest);
   const days = new Set();
   let date = '';
   let once = false;
@@ -608,9 +611,13 @@ export function parseBlockText(input, today) {
     if (word === 'today') date = today;
     else if (word === 'tomorrow') date = addDays(today, 1);
     else if (word === 'once') once = true;
-    else if (word === 'weekdays') [1, 2, 3, 4, 5].forEach((d) => days.add(d));
-    else if (word === 'daily' || word === 'every day') [0, 1, 2, 3, 4, 5, 6].forEach((d) => days.add(d));
-    else days.add(DAY_NAMES.findIndex((names) => names.includes(word)));
+    else if (word === 'weekdays') {
+      [1, 2, 3, 4, 5].forEach((d) => days.add(d));
+      asked = true;
+    } else if (word === 'daily' || word === 'every day') {
+      [0, 1, 2, 3, 4, 5, 6].forEach((d) => days.add(d));
+      asked = true;
+    } else days.add(DAY_NAMES.findIndex((names) => names.includes(word)));
     take(match);
   }
   // Words left over from "on Tue and Thu" at either end, but never inside the title.
@@ -626,7 +633,8 @@ export function parseBlockText(input, today) {
     const ahead = sortedDays.length ? Math.min(...sortedDays.map((d) => (d - weekday(today) + 7) % 7)) : 0;
     date = addDays(today, ahead);
   }
-  const repeats = sortedDays.length > 0 && !once;
+  // Two days or more can only be a series. One day is a single block unless a repeat was asked for.
+  const repeats = sortedDays.length > 0 && !once && (asked || sortedDays.length > 1);
   return {
     title: title ? title[0].toLocaleUpperCase() + title.slice(1) : '',
     type,

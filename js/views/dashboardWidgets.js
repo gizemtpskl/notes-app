@@ -95,7 +95,7 @@ function dayRow(db, item, today, refresh) {
     : item.kind === 'event' ? entry.url || null : `#/note/${encodeURIComponent(entry.noteId)}`;
   const where = item.kind === 'block'
     ? [`until ${item.end}`, entry.location].filter(Boolean).join(' · ')
-    : item.kind === 'event' ? 'Google Calendar' : entry.noteTitle;
+    : item.kind === 'event' ? 'Google Calendar' : [item.end && `until ${item.end}`, entry.noteTitle].filter(Boolean).join(' · ');
   const tag = item.when === 'now' ? 'Now' : item.when === 'next' ? 'Next' : item.overdue ? `Overdue, ${relativeDay(item.date, today).toLowerCase()}` : item.kind === 'deadline' ? 'Deadline' : '';
   return h('li', { class: `day-row is-${item.kind}${item.done ? ' is-done' : ''}${item.when ? ` is-${item.when}` : ''}`, dataset: { id: item.key, ...(item.kind === 'block' ? { color: entry.color } : {}) } },
     h('span', { class: 'day-time' }, item.time || ''),

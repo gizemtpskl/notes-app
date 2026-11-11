@@ -28,7 +28,7 @@ function fromEntry(entry, today) {
     kind,
     date: item.due,
     time: item.time ?? '',
-    end: '',
+    end: (item.time && item.end) || '',
     title: item.text || (kind === 'task' ? 'Task' : 'Untitled'),
     done: Boolean(item.done),
     overdue: !item.done && item.due < today,

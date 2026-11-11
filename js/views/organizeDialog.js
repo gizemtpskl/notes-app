@@ -4,6 +4,7 @@
  *
  * Resolves with the drafts to add ({ text, time, due }), or null if cancelled.
  */
+import { movedEnd } from '../data/tasks.js';
 import { parseTaskList } from '../data/taskText.js';
 import { openDialog } from '../ui/dialog.js';
 import { fill, h, plural } from '../ui/dom.js';
@@ -49,7 +50,10 @@ export function openOrganizeDialog({ text = '', today }) {
             value: draft.time,
             'aria-label': `Time of task ${number}`,
             onChange: () => {
+              const end = movedEnd(draft, timeInput.value);
               draft.time = timeInput.value;
+              if (end) draft.end = end;
+              else delete draft.end;
             },
           });
           const dueInput = h('input', {

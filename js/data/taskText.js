@@ -19,7 +19,10 @@ const DATE_END = new RegExp(`(?:^|[\\s,;-])(?:(?:on|by|next)\\s+)?(${DAY_WORDS})
 const BEFORE = '(?:^|[\\s,(])';
 const AFTER = '(?=[.,;)]?(?:\\s|$))';
 const AT = '(?:(?:at|@)\\s*)?';
-const UNTIL = '(?:\\s*[-–]\\s*\\d{1,2}[.:]\\d{2})?'; // The end of "15.00-16.00" is dropped.
+const UNTIL = '(?:\\s*[-–]\\s*\\d{1,2}[.:]\\d{2})?'; // An end the range below didn't accept is dropped.
+const CLOCK = (name) => `(?<${name}Hour>\\d{1,2})(?:(?<${name}Sep>[.:])(?<${name}Minute>\\d{2}))?\\s*(?:(?<${name}Half>[ap])\\.?m\\.?)?`;
+// "10:00-11:00", "10-11am", "9am to 10.30am", "15.00-16.00": a start and an end.
+const RANGE = new RegExp(`${BEFORE}(?:from\\s+)?${AT}${CLOCK('from')}\\s*(?:-|–|—|to|until)\\s*${CLOCK('to')}${AFTER}`, 'i');
 
 // Tried in this order, from the clearest sign to the least clear.
 const TIME_PATTERNS = [
@@ -44,7 +47,29 @@ function clockTime(hour, minute = 0, half = '') {
 
 const without = (line, match) => `${line.slice(0, match.index)} ${line.slice(match.index + match[0].length)}`;
 
+/**
+ * A range needs the same clear sign as one time: a colon, am/pm, or two-digit hours with a dot.
+ * So "pages 10-11" and "chapter 3.10-3.20" stay as written.
+ */
+function takeRange(line) {
+  const match = RANGE.exec(line);
+  if (!match) return null;
+  const g = match.groups;
+  const colon = g.fromSep === ':' || g.toSep === ':';
+  const half = Boolean(g.fromHalf || g.toHalf);
+  const dots = g.fromSep === '.' && g.toSep === '.' && g.fromHour.length === 2 && g.toHour.length === 2;
+  if (!colon && !half && !dots) return null;
+  // "6-8pm": the start shares the end's half of the day, unless that would put it after the end.
+  const fromHalf = g.fromHalf || (g.toHalf && Number(g.fromHour) <= Number(g.toHour) ? g.toHalf : '');
+  const time = clockTime(Number(g.fromHour), Number(g.fromMinute ?? 0), fromHalf);
+  const end = clockTime(Number(g.toHour), Number(g.toMinute ?? 0), g.toHalf);
+  if (!time || !end || end <= time) return null;
+  return { time, end, line: without(line, match) };
+}
+
 function takeTime(line) {
+  const range = takeRange(line);
+  if (range) return range;
   for (const pattern of TIME_PATTERNS) {
     const match = pattern.exec(line);
     if (match) {
@@ -72,19 +97,23 @@ function tidy(text) {
   return clean ? clean[0].toLocaleUpperCase() + clean.slice(1) : '';
 }
 
-/** Reads one line: { text, time, due }, or null if there's nothing on it. time is "HH:MM" or ''. */
+/**
+ * Reads one line: { text, time, due }, or null if there's nothing on it. time is "HH:MM" or ''.
+ * A range like "10:00-11:00" adds end: "HH:MM"; with no range there is no end.
+ */
 export function parseTaskLine(raw, today) {
   const original = raw.replace(BULLET, '').trim();
   if (!original) return null;
   let line = original;
   let time = '';
+  let end = '';
   let due = '';
   // Twice, because each can be hiding the other: "meeting 15.00 tomorrow", "tomorrow 15.00 meeting".
   for (let pass = 0; pass < 2; pass += 1) {
     const day = due ? null : takeDay(line.trim(), today);
     if (day) ({ due, line } = day);
     const clock = time ? null : takeTime(line.trim());
-    if (clock) ({ time, line } = clock);
+    if (clock) ({ time, line, end = '' } = clock);
   }
   if (!time) {
     const match = BARE_HOUR.exec(line.trim());
@@ -98,7 +127,8 @@ export function parseTaskLine(raw, today) {
   }
   const text = tidy(line);
   // A line that was only a time or a day is kept as written rather than lost.
-  return text ? { text, time, due: due || today } : { text: tidy(original), time: '', due: today };
+  if (!text) return { text: tidy(original), time: '', due: today };
+  return end ? { text, time, end, due: due || today } : { text, time, due: due || today };
 }
 
 /** Reads many lines into an organized list: soonest first, and timed tasks before the rest of their day. */

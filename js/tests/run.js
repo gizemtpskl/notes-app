@@ -53,7 +53,7 @@ import { averageMood, entryDate, moodSeries, onThisDay, streaks } from '../data/
 import { pickOne, pickerCandidates } from '../data/picker.js';
 import {
   addSubtask, agendaBuckets, createTask, earliestDue, flatten, indentTask, insertTaskAfter, locate, moveRelative,
-  nextOccurrence, normalizeTasks, outdentTask, progress, removeTask, shiftTask, toggleTask, updateTask,
+  nextOccurrence, normalizeTasks, outdentTask, progress, removeTask, shiftTask, taskTimeLabel, toggleTask, updateTask,
 } from '../data/tasks.js';
 import {
   BUILTIN_TYPES, agendaTitle, autoTitleFor, cleanType, displayTitle, dueIsOpen, isBlankNote, noteDueDate, noteWords, viewsFor,
@@ -1346,10 +1346,22 @@ describe('Timetable: quick add', () => {
   const TODAY = '2026-11-09'; // Monday
   const read = (text) => parseBlockText(text, TODAY);
 
-  it('reads the example from the request as a weekly class', () => {
+  it('reads one day as a single block: repeating is never the default', () => {
     equal(read('German Tue 18:15-20:00'), {
+      title: 'German', type: 'other', date: '2026-11-10', start: '18:15', end: '20:00', repeat: null, location: '',
+    });
+    equal(read('Dentist thursday 10:00-11:00').repeat, null);
+  });
+
+  it('repeats when the line asks for it', () => {
+    equal(read('German every Tue 18:15-20:00'), {
       title: 'German', type: 'other', date: '2026-11-10', start: '18:15', end: '20:00', repeat: { days: [2], weeks: 'every', until: '' }, location: '',
     });
+    equal(read('German each tue 18:15-20:00').repeat.days, [2]);
+    equal(read('Weekly review sun 18:00-18:30').repeat.days, [0]);
+    equal(read('Weekly review sun 18:00-18:30').title, 'Weekly review');
+    equal(read('Everyday stats tue 10:00-11:00').repeat, null, 'a word that starts with every is not every');
+    equal(read('German tue thu 18:15-20:00').repeat.days, [2, 4], 'two days can only be a series');
   });
 
   it('reads several days, other ways of writing times, and a place', () => {
@@ -1418,6 +1430,11 @@ describe('Your day and your week', () => {
   it('marks what is on now', () => {
     const { timed } = dayAgenda({ occurrences: [occ('Lecture', TODAY, '14:00', '16:00'), occ('Seminar', TODAY, '16:30', '17:00')], entries: [] }, TODAY, '15:10');
     equal(timed.map((i) => i.when), ['now', 'next']);
+  });
+
+  it('a task with an end fills its slot, and is on now inside it', () => {
+    const { timed } = dayAgenda({ occurrences: [occ('Lecture', TODAY, '12:00', '13:00')], entries: [task('Study', TODAY, { time: '10:00', end: '11:00' })] }, TODAY, '10:30');
+    equal(timed.map((i) => [i.title, i.time, i.end, i.when ?? '']), [['Study', '10:00', '11:00', 'now'], ['Lecture', '12:00', '13:00', 'next']]);
   });
 
   it('shows a task given a time on the timetable once, as its block', () => {
@@ -2241,6 +2258,11 @@ describe('Google Calendar', () => {
     equal(body.end, { dateTime: '2026-11-09T15:30:00', timeZone: ZONE });
   });
 
+  it('a task with an end becomes an event of that length', () => {
+    const body = eventBody({ text: 'Study', due: TODAY, time: '10:00', end: '11:30' }, ZONE);
+    equal([body.start.dateTime, body.end.dateTime], ['2026-11-09T10:00:00', '2026-11-09T11:30:00']);
+  });
+
   it('handles an event that runs past midnight or the end of the hour', () => {
     equal(eventBody({ text: 'x', due: TODAY, time: '23:45' }, ZONE).end.dateTime, '2026-11-10T00:15:00');
     equal(eventBody({ text: 'x', due: TODAY, time: '09:50' }, ZONE).end.dateTime, '2026-11-09T10:20:00');
@@ -2682,6 +2704,16 @@ describe('Google Calendar and the timetable', () => {
     equal([...api.events.keys()], ['mine']);
   });
 
+  it('a range typed on Today is kept as the task’s start and end', async () => {
+    const db = await freshDb();
+    const task = addDailyTask(db, '10:00-11:00 study', TODAY);
+    equal([task.text, task.time, task.end], ['Study', '10:00', '11:00']);
+    const saved = syncableTasks(db).find((t) => t.id === task.id);
+    equal([saved.time, saved.end], ['10:00', '11:00']);
+    const plain = addDailyTask(db, 'buy milk', TODAY);
+    equal([plain.time, 'end' in plain], ['', false]);
+  });
+
   it('leaves out a task that has a block, so it isn’t in the calendar twice', async () => {
     const db = await freshDb();
     addDailyTask(db, '15.00 write essay', TODAY);
@@ -2819,9 +2851,42 @@ describe('Reading messy task text', () => {
     reads('12pm lunch', 'Lunch', '12:00');
   });
 
-  it('keeps the start of a time range', () => {
-    reads('15.00-16.00 meeting', 'Meeting', '15:00');
-    reads('15:00 – 16:00 meeting', 'Meeting', '15:00');
+  it('reads a time range as a start and an end', () => {
+    const range = (line, text, time, end, due = TODAY) => equal(read(line), { text, time, end, due }, line);
+    range('15.00-16.00 meeting', 'Meeting', '15:00', '16:00');
+    range('15:00 – 16:00 meeting', 'Meeting', '15:00', '16:00');
+    range('10:00-11:00 study', 'Study', '10:00', '11:00');
+    range('study 10:00-11:00', 'Study', '10:00', '11:00');
+    range('call mum 2-3pm', 'Call mum', '14:00', '15:00');
+    range('gym 9am to 10.30am tomorrow', 'Gym', '09:00', '10:30', '2026-11-10');
+    range('from 9:30 to 11 lab report', 'Lab report', '09:30', '11:00');
+    range('study 11-1pm', 'Study', '11:00', '13:00');
+  });
+
+  it('a range that runs backwards, or is not clearly times, is not a range', () => {
+    reads('meeting 16:00-15:00', 'Meeting', '16:00');
+    reads('read pages 10-11', 'Read pages 10-11', '');
+    reads('read chapter 3.10-3.20', 'Read chapter 3.10-3.20', '');
+  });
+
+  it('a task keeps its end only with a start, and after it', () => {
+    const one = (item) => normalizeTasks([{ id: 'a', text: 'x', due: TODAY, ...item }])[0];
+    equal(one({ time: '10:00', end: '11:00' }).end, '11:00');
+    equal('end' in one({ time: '', end: '11:00' }), false);
+    equal('end' in one({ time: '10:00', end: '09:00' }), false);
+    equal('end' in one({ time: '10:00', end: '25:00' }), false);
+    equal('end' in one({ time: '10:00' }), false);
+  });
+
+  it('moving a task keeps its length, and clearing the time clears the end', () => {
+    const items = [{ ...createTask('Study', { due: TODAY, time: '10:00', end: '11:00' }), id: 't' }];
+    equal(updateTask(items, 't', { time: '14:30' })[0].end, '15:30');
+    equal('end' in updateTask(items, 't', { time: '' })[0], false);
+    equal('end' in updateTask(items, 't', { time: '23:30' })[0], false, 'no end past midnight');
+    equal(updateTask(items, 't', { time: '09:00', end: '12:00' })[0].end, '12:00');
+    equal('end' in updateTask(items, 't', { time: '09:00', end: '' })[0], false);
+    equal(taskTimeLabel(items[0]), '10:00–11:00');
+    equal(taskTimeLabel({ time: '10:00' }), '10:00');
   });
 
   it('leaves numbers that are not clearly times', () => {

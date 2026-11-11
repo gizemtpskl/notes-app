@@ -264,7 +264,7 @@ export function agenda(db, { from, to, today }) {
         for (const { item } of flatten(fieldValue(note, field))) {
           if (!item.due || item.done) continue;
           const entry = {
-            kind: 'task', text: item.text, ...(item.time ? { time: item.time } : {}), note: displayTitle(note, type) || 'Untitled', noteId: note.id, taskId: item.id,
+            kind: 'task', text: item.text, ...(item.time ? { time: item.time } : {}), ...(item.time && item.end ? { end: item.end } : {}), note: displayTitle(note, type) || 'Untitled', noteId: note.id, taskId: item.id,
           };
           if (item.due < start && item.due < today) overdue.push({ ...entry, due: item.due });
           else if (item.due >= start && item.due <= end) add(item.due, entry);
