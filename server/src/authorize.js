@@ -28,16 +28,32 @@ const STYLE = `
   button[value=approve] { border-color: var(--accent); background: var(--accent); color: var(--bg); font-weight: 600; }
 `;
 
-function page(title, body, status = 200, headers = new Headers()) {
+/**
+ * Where the form may lead. Browsers apply form-action to the redirect after the form is sent too,
+ * so the place the answer goes back to (Claude's callback) has to be allowed as well, or the
+ * browser silently stops at the Allow button.
+ */
+export function returnSource(redirectUri) {
+  try {
+    const url = new URL(redirectUri);
+    if (url.protocol === 'https:' || url.protocol === 'http:') return url.origin;
+    return /^[a-z][a-z0-9+.-]*:$/i.test(url.protocol) ? url.protocol : '';
+  } catch {
+    return '';
+  }
+}
+
+function page(title, body, status = 200, headers = new Headers(), returnTo = '') {
+  const formAction = ["'self'", returnSource(returnTo)].filter(Boolean).join(' ');
   headers.set('Content-Type', 'text/html; charset=utf-8');
-  headers.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+  headers.set('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`);
   headers.set('Referrer-Policy', 'no-referrer');
   return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>${STYLE}</style></head><body><main>${body}</main></body></html>`, { status, headers });
 }
 
 /** What the page shows about the asking app. Re-sent with the form only to show it again. */
 function consentForm({
-  clientName, clientDomain, redirectHost, redirectIsLoopback, extraScopes, wantsWrite,
+  clientName, clientDomain, redirectHost, redirectIsLoopback, returnTo, extraScopes, wantsWrite,
 }, handle, error = '') {
   const name = escapeHtml(clientName || 'An app');
   const origin = clientDomain ? `Published by <strong>${escapeHtml(clientDomain)}</strong>.` : 'This app registered itself, so its name isn’t verified.';
@@ -49,7 +65,7 @@ function consentForm({
     ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ''}
     <form method="post">
       ${keep('handle', handle)}
-      ${keep('clientName', clientName)}${keep('clientDomain', clientDomain ?? '')}${keep('redirectHost', redirectHost)}${keep('redirectIsLoopback', redirectIsLoopback ? '1' : '')}
+      ${keep('clientName', clientName)}${keep('clientDomain', clientDomain ?? '')}${keep('redirectHost', redirectHost)}${keep('redirectIsLoopback', redirectIsLoopback ? '1' : '')}${keep('returnTo', returnSource(returnTo))}
       ${extraScopes.map((scope) => keep('extra', scope)).join('')}
       <p>It will be able to search and read your notes, tasks, deadlines and timetable. Private notes are never included.</p>
       <label class="check"><input type="checkbox" name="write" value="1" ${wantsWrite ? 'checked' : ''}> <span>Also let it add and change notes, tasks and timetable blocks. It can never delete anything.</span></label>
@@ -77,7 +93,10 @@ export async function handleAuthorize(request, env, supported) {
       const details = await oauth.describeConsent(authRequest);
       const consent = await oauth.beginConsent(authRequest);
       const extraScopes = details.scope.filter((scope) => scope !== READ && scope !== WRITE && supported.includes(scope));
-      return page('Connect to your notes', consentForm({ ...details, extraScopes, wantsWrite: true }, consent.handle), 200, consent.headers);
+      const returnTo = authRequest.redirectUri;
+      return page('Connect to your notes', consentForm({
+        ...details, returnTo, extraScopes, wantsWrite: true,
+      }, consent.handle), 200, consent.headers, returnTo);
     }
     if (request.method !== 'POST') return page('Not found', '<h1>Not found</h1>', 404);
 
@@ -93,15 +112,16 @@ export async function handleAuthorize(request, env, supported) {
       clientDomain: String(form.get('clientDomain') ?? '') || null,
       redirectHost: String(form.get('redirectHost') ?? ''),
       redirectIsLoopback: form.get('redirectIsLoopback') === '1',
+      returnTo: String(form.get('returnTo') ?? ''),
       extraScopes: form.getAll('extra').map(String).filter((scope) => supported.includes(scope) && scope !== WRITE),
       wantsWrite: form.get('write') === '1',
     };
     if (await store.locked()) {
-      return page('Try again later', consentForm(shown, handle, 'Too many wrong keys. Try again in an hour.'), 429);
+      return page('Try again later', consentForm(shown, handle, 'Too many wrong keys. Try again in an hour.'), 429, undefined, shown.returnTo);
     }
     if (!keyMatches(String(form.get('key') ?? ''), env.ACCESS_KEY)) {
       await store.failed();
-      return page('Connect to your notes', consentForm(shown, handle, 'That access key isn’t right.'), 401);
+      return page('Connect to your notes', consentForm(shown, handle, 'That access key isn’t right.'), 401, undefined, shown.returnTo);
     }
     await store.succeeded();
     const scope = [READ, ...(shown.wantsWrite ? [WRITE] : []), ...shown.extraScopes];
