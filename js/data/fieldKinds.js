@@ -193,5 +193,20 @@ export function cleanFieldDef(raw) {
   }
   if (kind === 'rating') clean.max = [3, 5, 10].includes(raw.max) ? raw.max : 5;
   if (raw.summary === true) clean.summary = true;
+  const shortText = (value) => typeof value === 'string' && value.length <= 80;
+  const textList = (value, max) => Array.isArray(value) && value.length <= max && value.every(shortText);
+  // Settings a copied built-in type carries along: deadlines, status dates and starter tasks.
+  if (kind === 'date' && raw.role === 'due') {
+    clean.role = 'due';
+    if (shortText(raw.dueLabel) && raw.dueLabel) clean.dueLabel = raw.dueLabel;
+    const rule = raw.openWhile;
+    if (rule && shortText(rule.field) && rule.field && textList(rule.values, 100)) clean.openWhile = { field: rule.field, values: [...rule.values] };
+  }
+  if (kind === 'select' && raw.stamps && typeof raw.stamps === 'object' && !Array.isArray(raw.stamps)) {
+    const stamps = Object.fromEntries(Object.entries(raw.stamps).filter(([option, target]) => shortText(option) && shortText(target) && target).slice(0, 20));
+    if (Object.keys(stamps).length) clean.stamps = stamps;
+  }
+  if (kind === 'tasks' && textList(raw.starter, 30)) clean.starter = raw.starter.filter(Boolean);
+  if (raw.default !== undefined && (shortText(raw.default) || (Number.isFinite(raw.default) && kind === 'number'))) clean.default = raw.default;
   return clean;
 }

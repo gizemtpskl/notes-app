@@ -156,7 +156,7 @@ export function timelineView({ getNotes, getDateKey }) {
 
     const entry = ({ date, note }) => {
       const type = app.db.getType(note.typeId);
-      const chips = summaryFields(type).map((field) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true })).filter(Boolean);
+      const chips = summaryFields(type).map((field) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true, note })).filter(Boolean);
       return h('li', { class: 'tl-entry', dataset: { id: note.id, color: app.db.getSpace(note.spaceId)?.color ?? 'slate' } },
         h('time', { class: 'tl-date', datetime: date }, formatDay(date, { month: 'short', day: 'numeric' })),
         h('a', { class: 'tl-card', href: `#/note/${encodeURIComponent(note.id)}` },

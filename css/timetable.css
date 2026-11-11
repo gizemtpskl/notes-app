@@ -141,6 +141,54 @@
   .block-link .field-label { width: 100%; }
 }
 
+/* -- Month ---------------------------------------------------------------------------- */
+.tt-month { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
+.tt-month-head { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 12px; font-weight: 600; text-align: center; }
+.tt-month-head span { padding: 6px 2px; }
+.tt-month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.tt-month-day { display: flex; flex-direction: column; gap: 3px; min-width: 0; min-height: 112px; padding: 4px 4px 6px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.tt-month-day:nth-child(7n) { border-right: 0; }
+.tt-month-day:nth-last-child(-n + 7) { border-bottom: 0; }
+.tt-month-day.is-outside { background: var(--bg); }
+.tt-month-day.is-outside .tt-month-date { color: var(--text-faint); }
+.tt-month-day.is-today { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.tt-month-date { align-self: flex-start; min-width: 26px; height: 24px; padding: 0 6px; border: 0; border-radius: 12px; background: none; color: var(--text-muted); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 600; cursor: pointer; }
+.tt-month-date:hover { background: var(--bg-hover); color: var(--text); }
+.tt-month-day.is-today .tt-month-date { background: var(--accent); color: var(--accent-text); }
+.tt-month-date:focus-visible, .tt-month-item:focus-visible, .tt-month-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tt-month-list { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.tt-month-item { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; padding: 1px 4px; border: 0; border-radius: 4px; background: color-mix(in srgb, var(--space, var(--c-slate)) 16%, transparent); color: var(--text); font: inherit; font-size: 12px; line-height: 1.5; text-align: left; text-decoration: none; cursor: pointer; }
+.tt-month-item:hover { background: color-mix(in srgb, var(--space, var(--c-slate)) 28%, transparent); }
+.tt-month-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--space, var(--c-slate)); }
+.tt-month-time { flex: none; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tt-month-title { overflow: hidden; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+.tt-month-item.is-task { border-radius: 10px; background: none; }
+.tt-month-item.is-task:hover { background: var(--bg-hover); }
+.tt-month-item.is-event { padding: 0 3px; border: 1px dashed var(--border-strong); background: var(--bg-raised); cursor: default; }
+a.tt-month-item.is-event { cursor: pointer; }
+.tt-month-item.is-event:hover { background: var(--bg-hover); }
+.tt-month-item.is-event .tt-month-dot { border: 1px solid var(--text-faint); background: none; }
+.tt-month-item.is-cancelled .tt-month-title, .tt-month-item.is-done .tt-month-title { color: var(--text-muted); text-decoration: line-through; }
+.tt-month-more { align-self: flex-start; padding: 0 4px; border: 0; border-radius: 4px; background: none; color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.tt-month-more:hover { background: var(--bg-hover); color: var(--text); }
+
+/* On a phone the month shows dots; a date opens the day with everything written out. */
+@media (max-width: 560px) {
+  .tt-month-day { align-items: center; min-height: 64px; padding: 3px 1px 5px; }
+  .tt-month-date { align-self: center; }
+  .tt-month-list { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; }
+  .tt-month-item, .tt-month-item.is-event, .tt-month-item.is-task { width: auto; padding: 4px; border: 0; background: none; }
+  .tt-month-time, .tt-month-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .tt-month-more { padding: 0 2px; font-size: 11px; }
+  .tt-month-more-word { display: none; }
+}
+
+@media print {
+  .tt-month { border-color: #888; }
+  .tt-month-day { min-height: 90px; border-color: #bbb; break-inside: avoid; }
+  .tt-month-item { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+
 /* -- Dragging ------------------------------------------------------------------------- */
 .tt-body.is-dragging, body.is-dragging-task { cursor: grabbing; user-select: none; }
 .tt-resize { position: absolute; right: 0; bottom: 0; left: 0; height: 7px; cursor: ns-resize; }

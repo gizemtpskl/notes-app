@@ -14,15 +14,26 @@
  *   picker          settings for the random picker: see data/picker.js
  *   byLecture       true: offers the By lecture and By topic views
  *   focusOnNew      where the caret starts in a new note: 'title' (default) or 'body'
+ *   collectionName  a name the New collection dialog suggests for a collection of these
+ *   subtitleField   a field shown after the title in agendas, such as the company
+ *
+ * Field settings beyond kind and name:
+ *   role: 'due'     a date field that's a deadline: it shows on Today and the dashboard
+ *   dueLabel        what the deadline is called there ("Apply"), instead of the field's name
+ *   openWhile       { field, values }: the deadline only counts while that field has one of them
+ *   stamps          on a select: { option: dateFieldId }, choosing the option fills in today's date
+ *   starter         on a task list: tasks every new note starts with
  *
  * Field values are stored by field id, so renaming a field keeps its data, and values survive
  * changing a note to another type and back.
  */
 import { formatDay, toDateStr } from './dates.js';
-import { emptyValue, fieldValue, FIELD_KINDS, cleanFieldDef, isEmptyValue, valueToText } from './fieldKinds.js';
+import {
+  emptyValue, fieldValue, FIELD_KINDS, cleanFieldDef, isEmptyValue, normalizeValue, valueToText,
+} from './fieldKinds.js';
 import { escapeHtml, isBodyEmpty } from './html.js';
 import { DEFAULT_TYPE_ID, uid } from './schema.js';
-import { earliestDue, flatten } from './tasks.js';
+import { createTask, earliestDue, flatten } from './tasks.js';
 import { countWords, snippet } from './text.js';
 
 export const VIEWS = Object.freeze({
@@ -242,6 +253,93 @@ export const BUILTIN_TYPES = Object.freeze([
   }),
 
   builtin({
+    id: 'jobApplication',
+    name: 'Job application',
+    collectionName: 'Job applications',
+    icon: '💼',
+    defaultView: 'kanban',
+    groupBy: 'status',
+    bodyLabel: 'Notes',
+    subtitleField: 'company',
+    fields: [
+      { id: 'company', name: 'Company', kind: 'text', summary: true },
+      {
+        id: 'status',
+        name: 'Status',
+        kind: 'select',
+        options: ['Interested', 'Preparing', 'Applied', 'Interviewing', 'Offer', 'Rejected', 'Withdrawn'],
+        default: 'Interested',
+        summary: true,
+        stamps: { Applied: 'appliedOn' },
+      },
+      {
+        id: 'deadline', name: 'Deadline', kind: 'date', role: 'due', dueLabel: 'Apply', openWhile: { field: 'status', values: ['', 'Interested', 'Preparing'] }, summary: true,
+      },
+      {
+        id: 'interview', name: 'Next interview', kind: 'date', role: 'due', dueLabel: 'Interview', openWhile: { field: 'status', values: ['Applied', 'Interviewing'] }, summary: true,
+      },
+      { id: 'location', name: 'Location', kind: 'text' },
+      { id: 'workMode', name: 'Work mode', kind: 'select', options: ['On-site', 'Hybrid', 'Remote'] },
+      { id: 'salary', name: 'Salary', kind: 'text' },
+      { id: 'posting', name: 'Job posting', kind: 'url' },
+      {
+        id: 'foundVia', name: 'Found through', kind: 'select', creatable: true, options: ['LinkedIn', 'Company website', 'Job board', 'Referral', 'Career fair'],
+      },
+      { id: 'contact', name: 'Contact person', kind: 'text' },
+      { id: 'appliedOn', name: 'Applied on', kind: 'date' },
+      { id: 'excitement', name: 'How much I want it', kind: 'rating' },
+      {
+        id: 'todo', name: 'To do', kind: 'tasks', starter: ['Tailor CV', 'Write cover letter', 'Send application'],
+      },
+    ],
+  }),
+
+  builtin({
+    id: 'phdApplication',
+    name: 'PhD application',
+    collectionName: 'PhD applications',
+    icon: '🎓',
+    defaultView: 'kanban',
+    groupBy: 'status',
+    bodyLabel: 'Notes',
+    subtitleField: 'university',
+    fields: [
+      { id: 'university', name: 'University', kind: 'text', summary: true },
+      {
+        id: 'status',
+        name: 'Status',
+        kind: 'select',
+        options: ['Researching', 'Contacted supervisor', 'Preparing', 'Submitted', 'Interview', 'Offer', 'Rejected', 'Withdrawn'],
+        default: 'Researching',
+        summary: true,
+        stamps: { Submitted: 'submittedOn' },
+      },
+      {
+        id: 'deadline', name: 'Deadline', kind: 'date', role: 'due', dueLabel: 'Apply', openWhile: { field: 'status', values: ['', 'Researching', 'Contacted supervisor', 'Preparing'] }, summary: true,
+      },
+      {
+        id: 'interview', name: 'Interview', kind: 'date', role: 'due', dueLabel: 'Interview', openWhile: { field: 'status', values: ['Submitted', 'Interview'] }, summary: true,
+      },
+      { id: 'supervisor', name: 'Supervisor', kind: 'text' },
+      { id: 'group', name: 'Research group', kind: 'text' },
+      { id: 'country', name: 'Country', kind: 'select', creatable: true, options: [] },
+      { id: 'funding', name: 'Funding', kind: 'select', options: ['Fully funded', 'Partly funded', 'Not funded', 'Unknown'] },
+      { id: 'stipend', name: 'Stipend', kind: 'text' },
+      { id: 'startDate', name: 'Start date', kind: 'date' },
+      { id: 'page', name: 'Programme page', kind: 'url' },
+      { id: 'contactedOn', name: 'Supervisor contacted on', kind: 'date' },
+      { id: 'submittedOn', name: 'Submitted on', kind: 'date' },
+      { id: 'fit', name: 'How much I want it', kind: 'rating' },
+      {
+        id: 'documents',
+        name: 'Documents',
+        kind: 'tasks',
+        starter: ['CV', 'Research proposal', 'Motivation letter', 'Reference letter 1', 'Reference letter 2', 'Transcripts and certificates', 'Language certificate'],
+      },
+    ],
+  }),
+
+  builtin({
     id: 'meeting',
     name: 'Meeting or call',
     icon: '🗓️',
@@ -255,11 +353,12 @@ export const BUILTIN_TYPES = Object.freeze([
   }),
 ]);
 
-/** Starting values for a new note. */
+/** Starting values for a new note. A task list's `starter` gives it fresh tasks to tick off. */
 export function defaultFieldValues(type, now = Date.now()) {
   const values = {};
   for (const field of type.fields) {
-    if (field.default === 'today') values[field.id] = toDateStr(new Date(now));
+    if (field.kind === 'tasks' && field.starter?.length) values[field.id] = field.starter.map((text) => createTask(text));
+    else if (field.default === 'today') values[field.id] = toDateStr(new Date(now));
     else if (field.default !== undefined) values[field.id] = field.default;
     else values[field.id] = emptyValue(field);
   }
@@ -346,6 +445,40 @@ export function tasksFields(type) {
   return type.fields.filter((f) => f.kind === 'tasks');
 }
 
+/**
+ * Whether a deadline field still matters. A field with openWhile only counts while another field
+ * (a status) has one of the listed values: an application deadline stops mattering once it's sent.
+ */
+export function dueIsOpen(note, type, field) {
+  const rule = field.openWhile;
+  if (!rule) return true;
+  const by = type.fields.find((f) => f.id === rule.field);
+  return !by || rule.values.includes(fieldValue(note, by));
+}
+
+/**
+ * Field changes that follow from a patch: a select whose `stamps` names a date field for the new
+ * value fills that date with today, when it's still empty. { fieldId: value }, often empty.
+ */
+export function stampedFields(type, before, after, today) {
+  const extra = {};
+  for (const field of type.fields) {
+    const target = field.kind === 'select' ? field.stamps?.[normalizeValue(field, after[field.id])] : null;
+    if (!target || normalizeValue(field, before[field.id]) === normalizeValue(field, after[field.id])) continue;
+    const dateField = type.fields.find((f) => f.id === target && f.kind === 'date');
+    if (dateField && !normalizeValue(dateField, after[target])) extra[target] = today;
+  }
+  return extra;
+}
+
+/** The name an agenda shows for a note: its title, and its subtitle field (a company) when set. */
+export function agendaTitle(note, type) {
+  const title = displayTitle(note, type) || 'Untitled';
+  const field = type.subtitleField && type.fields.find((f) => f.id === type.subtitleField);
+  const extra = field ? String(fieldValue(note, field) ?? '').trim() : '';
+  return extra && extra !== title ? `${title} · ${extra}` : title;
+}
+
 /** The next date a note needs attention: its earliest open task, or its deadline. */
 export function noteDueDate(note, type) {
   let due = '';
@@ -353,7 +486,7 @@ export function noteDueDate(note, type) {
     if (field.kind === 'tasks') {
       const next = earliestDue(fieldValue(note, field));
       if (next && (!due || next < due)) due = next;
-    } else if (field.role === 'due') {
+    } else if (field.role === 'due' && dueIsOpen(note, type, field)) {
       const value = fieldValue(note, field);
       if (value && (!due || value < due)) due = value;
     }
@@ -389,6 +522,10 @@ export function isBlankNote(note, type, defaults = defaultFieldValues(type, note
   if (!isBodyEmpty(note.body)) return false;
   return type.fields.every((field) => {
     const value = fieldValue(note, field);
+    // Starter tasks get new ids each time, so they're compared by what they say.
+    if (field.kind === 'tasks' && field.starter?.length) {
+      return flatten(value).every(({ item }) => !item.done && !item.due) && JSON.stringify(flatten(value).map(({ item }) => item.text)) === JSON.stringify(field.starter);
+    }
     return isEmptyValue(field, value) || JSON.stringify(value) === JSON.stringify(defaults[field.id]);
   });
 }

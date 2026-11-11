@@ -38,9 +38,9 @@ import { fold } from './text.js';
 import { blockProblem, createSemester, createTimeBlock, toMinutes } from './timetable.js';
 import { createHabit, toggleHabitDay } from './habits.js';
 import { syncsRecord } from './syncScope.js';
-import { isDateStr } from './dates.js';
+import { isDateStr, toDateStr } from './dates.js';
 import {
-  BUILTIN_TYPES, autoTitleFor, createCustomType, defaultFieldValues, fieldsToHtml, noteDueDate,
+  BUILTIN_TYPES, autoTitleFor, createCustomType, defaultFieldValues, fieldsToHtml, noteDueDate, stampedFields,
 } from './types.js';
 
 const FLUSH_DELAY_MS = 250;
@@ -602,6 +602,11 @@ export class NotesDb {
   updateNote(id, patch, { now = Date.now() } = {}) {
     const note = this._require('notes', id);
     const next = { ...note, ...patch, id };
+    if ('fields' in patch) {
+      // A status that names a date to fill in, like "Applied" filling "Applied on".
+      const stamps = stampedFields(this.getType(next.typeId), note.fields ?? {}, next.fields ?? {}, toDateStr(new Date(now)));
+      if (Object.keys(stamps).length) next.fields = { ...next.fields, ...stamps };
+    }
     if ('body' in patch) {
       next.body = sanitizeHtml(patch.body);
       next.text = htmlToText(next.body);

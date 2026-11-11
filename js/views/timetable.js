@@ -1,9 +1,11 @@
 /**
- * timetable.js: the weekly timetable page: a week grid, a single day, and an agenda list.
+ * timetable.js: the weekly timetable page: a week grid, a single day, a month, and an agenda list.
  *
  * Keyboard: Tab reaches the blocks. The arrow keys move between them (up and down within a day,
  * left and right to the nearest block on another day), and Enter opens one.
- * On a phone the page opens on one day, and swiping sideways moves between days.
+ * On a phone the page opens on one day, and swiping sideways moves between days (or months).
+ * The month shows each day's items as short lines, or as coloured dots on a phone; a date opens
+ * that day. Nothing is dragged there: the week and day grids are for that.
  * With a mouse, blocks can be drawn, moved and resized on the grid (see gridDrag.js), and tasks
  * from the task list dropped onto it.
  *
@@ -14,7 +16,9 @@
  */
 import { app } from '../context.js';
 import { weekEvents } from '../data/calendarTimetable.js';
-import { addDays, daysBetween, firstDayOfWeek, formatDay, isDateStr, toDateStr } from '../data/dates.js';
+import {
+  addDays, addMonths, daysBetween, firstDayOfWeek, formatDay, isDateStr, monthGrid, toDateStr,
+} from '../data/dates.js';
 import { calendarConfig } from '../data/googleCalendar.js';
 import { toggleTask, updateTask } from '../data/tasks.js';
 import {
@@ -41,7 +45,9 @@ const HOUR_PX = 48;
 /** How long a task with a time looks on the grid. The same length its calendar event gets. */
 const TASK_MINUTES = 30;
 const SNAP = 15;
-const VIEWS = [['week', 'Week'], ['day', 'Day'], ['agenda', 'Agenda']];
+const VIEWS = [['week', 'Week'], ['day', 'Day'], ['month', 'Month'], ['agenda', 'Agenda']];
+/** Items a day shows in the month before "+ more". */
+const MONTH_ITEMS = 4;
 const narrow = () => window.matchMedia('(max-width: 720px)').matches;
 
 const nowTime = () => {
@@ -130,6 +136,11 @@ export function timetableView({ query } = {}) {
   };
   const span = () => {
     if (mode === 'day') return [anchor, anchor];
+    if (mode === 'month') {
+      const [year, month] = anchor.split('-').map(Number);
+      const weeks = monthGrid(year, month - 1, weekStart());
+      return [weeks[0][0], weeks.at(-1)[6]];
+    }
     const first = startOfWeek(anchor, weekStart());
     return [first, addDays(first, 6)];
   };
@@ -145,7 +156,14 @@ export function timetableView({ query } = {}) {
   }
 
   function step(direction) {
-    go(addDays(anchor, direction * (mode === 'day' ? 1 : 7)));
+    if (mode === 'month') go(addMonths(anchor, direction));
+    else go(addDays(anchor, direction * (mode === 'day' ? 1 : 7)));
+  }
+
+  /** Opens one day, from the month. */
+  function openDay(date) {
+    mode = 'day';
+    go(date, '.page-title');
   }
 
   // -- Quick add -------------------------------------------------------------------------
@@ -441,10 +459,75 @@ export function timetableView({ query } = {}) {
       h('ul', { class: 'tt-agenda-list' }, all.filter((o) => o.date === date).sort(order).map(agendaRow)))));
   }
 
+  // -- Month ---------------------------------------------------------------------------------
+
+  /** One item in a month's day: its time and name. Each opens what it opens elsewhere. */
+  function monthItem(item) {
+    const isTask = item.kind === 'task';
+    const isEvent = item.kind === 'event';
+    const blockTask = !isTask && !isEvent && item.task ? findTask(db, item.task) : null;
+    const title = blockTask ? blockTask.item.text || 'Task' : item.title;
+    const done = isTask ? item.done : Boolean(blockTask?.item.done);
+    let when = item.allDay ? 'all day' : `${item.start} to ${item.end}`;
+    if (isTask) when = item.start;
+    const source = [isTask && `task in ${item.noteTitle}`, isEvent && 'Google Calendar', item.cancelled && 'cancelled', done && 'done'].filter(Boolean);
+    const classes = `tt-month-item${isEvent ? ' is-event' : ''}${isTask ? ' is-task' : ''}${item.cancelled ? ' is-cancelled' : ''}${done ? ' is-done' : ''}`;
+    const content = [
+      h('span', { class: 'tt-month-dot', 'aria-hidden': 'true' }),
+      !item.allDay && h('span', { class: 'tt-month-time' }, item.start),
+      h('span', { class: 'tt-month-title' }, title),
+      h('span', { class: 'sr-only' }, `, ${[when, ...source].join(', ')}`),
+    ];
+    const props = {
+      class: classes,
+      dataset: isEvent ? { key: item.key } : { key: item.key, color: item.color ?? 'slate' },
+      title: `${title} · ${item.allDay ? 'all day' : `${item.start}${isTask ? '' : `–${item.end}`}`}${source.length ? ` · ${source.join(' · ')}` : ''}`,
+    };
+    if (isEvent) {
+      return item.url
+        ? h('a', {
+          ...props, href: item.url, target: '_blank', rel: 'noopener noreferrer',
+        }, content)
+        : h('span', { ...props, tabindex: '0' }, content);
+    }
+    if (isTask) return h('a', { ...props, href: `#/note/${encodeURIComponent(item.ref.noteId)}` }, content);
+    return h('button', {
+      ...props, type: 'button', onClick: () => openBlockDialog({ blockId: item.blockId, originalDate: item.originalDate }),
+    }, content);
+  }
+
+  function month(days, items, allDay, today) {
+    const inMonth = anchor.slice(0, 7);
+    const order = (a, b) => Number(Boolean(b.allDay)) - Number(Boolean(a.allDay)) || (a.start ?? '').localeCompare(b.start ?? '') || a.title.localeCompare(b.title);
+    const all = [...allDay, ...items];
+    const byDay = new Map(days.map((date) => [date, []]));
+    for (const item of all) byDay.get(item.date)?.push(item);
+    return h('div', { class: 'tt-month', role: 'region', 'aria-label': formatDay(anchor, { month: 'long', year: 'numeric' }) },
+      h('div', { class: 'tt-month-head', 'aria-hidden': 'true' }, days.slice(0, 7).map((date) => h('span', null, formatDay(date, { weekday: 'short' })))),
+      h('ol', { class: 'tt-month-grid' }, days.map((date) => {
+        const list = byDay.get(date).sort(order);
+        const extra = list.length - MONTH_ITEMS;
+        const shown = extra > 0 ? list.slice(0, MONTH_ITEMS - 1) : list;
+        const isToday = date === today;
+        return h('li', { class: `tt-month-day${date.slice(0, 7) === inMonth ? '' : ' is-outside'}${isToday ? ' is-today' : ''}`, dataset: { date } },
+          h('button', {
+            class: 'tt-month-date',
+            type: 'button',
+            'aria-label': `${formatDay(date, { weekday: 'long', month: 'long', day: 'numeric' })}${isToday ? ', today' : ''}, ${list.length ? plural(list.length, 'item') : 'nothing planned'}. Open the day.`,
+            onClick: () => openDay(date),
+          }, formatDay(date, { day: 'numeric' })),
+          list.length > 0 && h('ul', { class: 'tt-month-list' },
+            shown.map((item) => h('li', null, monthItem(item))),
+            extra > 0 && h('li', null, h('button', {
+              class: 'tt-month-more', type: 'button', onClick: () => openDay(date), 'aria-label': `${extra + 1} more on ${formatDay(date, { weekday: 'long', month: 'long', day: 'numeric' })}`,
+            }, `+${extra + 1}`, h('span', { class: 'tt-month-more-word' }, ' more')))));
+      })));
+  }
+
   function render(focusSelector) {
     const today = toDateStr();
     const [from, to] = span();
-    const days = Array.from({ length: mode === 'day' ? 1 : 7 }, (_, i) => addDays(from, i));
+    const days = Array.from({ length: daysBetween(from, to) + 1 }, (_, i) => addDays(from, i));
     const occurrences = loadOccurrences(db, from, to);
     const tasks = timedTaskItems(db, from, to, occurrences);
     const events = calendarEventItems(db, from, to);
@@ -453,17 +536,19 @@ export function timetableView({ query } = {}) {
     eventsShown = calendarConfig(db).on && calendarConfig(db).showEvents;
     // Blocks and tasks can be dragged; events belong to Google Calendar and stay put.
     shown = new Map([...occurrences, ...tasks].map((o) => [o.key, o]));
-    refreshWeekEvents(startOfWeek(anchor, weekStart()));
+    // The month reads each of its weeks; a week that was read a few minutes ago isn't read again.
+    for (let week = startOfWeek(from, weekStart()); week <= to; week = addDays(week, 7)) refreshWeekEvents(week);
     const active = body.contains(document.activeElement) ? document.activeElement : null;
     const focusKey = active?.closest('[data-key]')?.dataset.key ?? null;
     const focusCheck = Boolean(active?.classList.contains('tt-task-check'));
     const focusTask = active?.closest('[data-task-id]')?.dataset.taskId ?? null;
 
-    rangeLabel.textContent = mode === 'day'
-      ? `${formatDay(anchor, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · Week ${isoWeek(anchor)}`
-      : `${formatDay(from, { month: 'short', day: 'numeric' })} – ${formatDay(to)} · Week ${isoWeek(addDays(from, 3))}`;
-    prevButton.setAttribute('aria-label', mode === 'day' ? 'Previous day' : 'Previous week');
-    nextButton.setAttribute('aria-label', mode === 'day' ? 'Next day' : 'Next week');
+    if (mode === 'day') rangeLabel.textContent = `${formatDay(anchor, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} · Week ${isoWeek(anchor)}`;
+    else if (mode === 'month') rangeLabel.textContent = formatDay(anchor, { month: 'long', year: 'numeric' });
+    else rangeLabel.textContent = `${formatDay(from, { month: 'short', day: 'numeric' })} – ${formatDay(to)} · Week ${isoWeek(addDays(from, 3))}`;
+    const unit = { day: 'day', month: 'month' }[mode] ?? 'week';
+    prevButton.setAttribute('aria-label', `Previous ${unit}`);
+    nextButton.setAttribute('aria-label', `Next ${unit}`);
 
     fill(switcher, VIEWS.map(([id, label]) => h('button', {
       class: 'view-btn',
@@ -477,15 +562,20 @@ export function timetableView({ query } = {}) {
       },
     }, label)));
 
-    const live = occurrences.filter((o) => !o.cancelled);
+    // The month counts its own days, not the days of other months around them.
+    const live = occurrences.filter((o) => !o.cancelled && (mode !== 'month' || o.date.slice(0, 7) === anchor.slice(0, 7)));
     const hoursBooked = live.reduce((sum, o) => sum + blockMinutes(o), 0) / 60;
     const summary = mode !== 'day' && live.length > 0
-      && h('p', { class: 'tt-summary' }, `${plural(live.length, 'block')}, ${hoursBooked.toLocaleString(undefined, { maximumFractionDigits: 1 })} hours this week`);
+      && h('p', { class: 'tt-summary' }, `${plural(live.length, 'block')}, ${hoursBooked.toLocaleString(undefined, { maximumFractionDigits: 1 })} hours this ${mode === 'month' ? 'month' : 'week'}`);
 
     tasksButton.setAttribute('aria-pressed', String(showTasks));
+    let view;
+    if (mode === 'agenda') view = agenda(days, items, allDay, today);
+    else if (mode === 'month') view = month(days, items, allDay, today);
+    else view = grid(days, items, allDay, today);
     const main = [
-      mode === 'agenda' ? agenda(days, items, allDay, today) : grid(days, items, allDay, today),
-      mode !== 'agenda' && !db.listBlocks().length && h('p', { class: 'empty-line tt-hint' }, 'Click or drag on an empty part of the grid, type a block above, or use New block.'),
+      view,
+      onGrid() && !db.listBlocks().length && h('p', { class: 'empty-line tt-hint' }, 'Click or drag on an empty part of the grid, type a block above, or use New block.'),
     ];
     fill(body,
       summary,
@@ -504,6 +594,11 @@ export function timetableView({ query } = {}) {
   }
 
   // -- Tasks to give a time ----------------------------------------------------------------
+
+  /** The week and day grids, where things can be drawn and dragged. */
+  function onGrid() {
+    return mode === 'week' || mode === 'day';
+  }
 
   function defaultDay(today, from, to) {
     return today >= from && today <= to ? today : from;
@@ -531,14 +626,14 @@ export function timetableView({ query } = {}) {
     const tasks = tasksToSchedule(db, today);
     const rows = tasks.slice(0, TASK_LIMIT).map((entry) => {
       const grip = h('span', { class: 'tt-task-grip', 'aria-hidden': 'true', title: 'Drag onto the timetable' }, icon('grip', 14));
-      if (mode !== 'agenda') {
+      if (onGrid()) {
         taskHandleDrag(grip, entry.item.text || 'Task', {
           geometry: () => geom,
           onDrop: (date, start) => scheduleTask(entry, date, start),
         });
       }
       return h('li', { class: 'tt-task-row', dataset: { taskId: entry.item.id } },
-        mode !== 'agenda' && grip,
+        onGrid() && grip,
         h('span', { class: 'tt-task-main' },
           h('span', { class: 'tt-task-text' }, entry.item.text || 'Task'),
           h('span', { class: 'tt-task-from' }, entry.noteTitle, entry.item.due && ` · due ${formatDay(entry.item.due, { month: 'short', day: 'numeric' })}`)),
@@ -565,7 +660,7 @@ export function timetableView({ query } = {}) {
       h('h2', { class: 'section-title', id: 'tt-tasks-title' }, 'Tasks to schedule'),
       tasks.length
         ? [
-          h('p', { class: 'field-hint' }, mode === 'agenda' ? 'Use Schedule to give a task a time.' : 'Drag a task onto a day, or use Schedule. Unscheduling a block puts its task back here.'),
+          h('p', { class: 'field-hint' }, !onGrid() ? 'Use Schedule to give a task a time.' : 'Drag a task onto a day, or use Schedule. Unscheduling a block puts its task back here.'),
           h('ul', { class: 'tt-task-list' }, rows),
           tasks.length > TASK_LIMIT && h('p', { class: 'field-hint' }, `and ${tasks.length - TASK_LIMIT} more, due later or with no date.`)]
         : h('p', { class: 'empty-line' }, 'No open tasks to schedule.'));
@@ -665,7 +760,7 @@ export function timetableView({ query } = {}) {
         label: 'Find free time',
         icon: 'search',
         onSelect: () => {
-          const [from] = mode === 'day' ? [anchor] : span();
+          const [from] = mode === 'week' ? span() : [anchor];
           openFreeTimeDialog({
             from,
             hours: hoursSetting(),
@@ -685,7 +780,7 @@ export function timetableView({ query } = {}) {
 
   let swipe = null;
   body.addEventListener('pointerdown', (event) => {
-    if (event.pointerType === 'touch' && mode === 'day') swipe = { x: event.clientX, y: event.clientY };
+    if (event.pointerType === 'touch' && (mode === 'day' || mode === 'month')) swipe = { x: event.clientX, y: event.clientY };
   });
   body.addEventListener('pointerup', (event) => {
     if (!swipe) return;
@@ -722,8 +817,8 @@ export function timetableView({ query } = {}) {
         h('h1', { class: 'page-title', tabindex: '-1' }, 'Timetable'),
         h('div', { class: 'page-actions' },
           h('button', {
-            class: 'btn', type: 'button', onClick: openTimetableSettings,
-          }, icon('settings', 16), h('span', { class: 'tt-label-wide' }, 'Hours and semesters')),
+            class: 'btn', type: 'button', onClick: openTimetableSettings, 'aria-label': 'Hours and semesters', title: 'Hours and semesters',
+          }, icon('settings', 16), h('span', { class: 'tt-label-wide', 'aria-hidden': 'true' }, 'Hours and semesters')),
           h('button', {
             class: 'btn btn-primary',
             type: 'button',

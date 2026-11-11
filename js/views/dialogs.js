@@ -99,8 +99,17 @@ export function editCollectionDialog({ collection = null, spaceId, parentId = nu
       const name = h('input', {
         class: 'input', type: 'text', value: collection?.name ?? '', required: true, autofocus: true, maxlength: 80, placeholder: 'A project, list or notebook',
       });
-      const typeSelect = h('select', { class: 'select select-field', id: 'collection-type' },
-        app.db.listTypes().map((type) => h('option', { value: type.id, selected: type.id === startType }, `${type.icon}  ${type.name}`)));
+      // Picking a type like "Job application" suggests a name, until one is typed in.
+      let suggested = '';
+      const typeSelect = h('select', {
+        class: 'select select-field',
+        id: 'collection-type',
+        onChange: () => {
+          if (collection || (name.value.trim() && name.value !== suggested)) return;
+          suggested = app.db.getType(typeSelect.value).collectionName ?? '';
+          name.value = suggested;
+        },
+      }, app.db.listTypes().map((type) => h('option', { value: type.id, selected: type.id === startType }, `${type.icon}  ${type.name}`)));
       return h('form', {
         onSubmit: (event) => {
           event.preventDefault();

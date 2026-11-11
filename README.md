@@ -52,7 +52,9 @@ Today's tasks, Schedule, Next 7 days and Weekly progress are also available in *
 
 ## Timetable
 
-**Timetable** in the sidebar (`G` then `C`) has a week grid, a single day and an agenda list. On a phone it opens on today, and swiping sideways changes the day.
+**Timetable** in the sidebar (`G` then `C`) has a week grid, a single day, a month and an agenda list. On a phone it opens on today, and swiping sideways changes the day (or the month).
+
+- **Month:** each day lists its blocks, tasks with a time and Google events in time order, with **+ more** when there are over four. Click a date, or **+ more**, to open that day. On a phone the items are coloured dots. Blocks are dragged in the week and day views, not here.
 
 - **Adding:** type a line like `German Tue 18:15-20:00` and press Enter, click an empty spot in the grid, or use **New block**. Typed lines are shown in the editor first, so you can check them.
 - **Repeating:** pick weekdays, every week, every 2 weeks, or odd or even weeks. A semester stops its blocks on its last day (**Hours and semesters**).
@@ -66,6 +68,17 @@ Today's tasks, Schedule, Next 7 days and Weekly progress are also available in *
 - **Reminders:** choose one in a block's editor. They show while the app is open in a tab, as a notification if you allow it. A static site has no server, so it can't remind you while it's closed.
 - **More (⋯):** **Find free time**, **Print this week**, **Export as .ics**, and **Import an .ics file**, which shows what's in the file and lets you choose before anything is added. Calendar files use local times, and odd or even weeks are written out week by week, because calendar apps can't express them.
 - **Keyboard:** Tab to a block, use the arrow keys to move between blocks, and press Enter to open one.
+
+## Application trackers
+
+Two built-in note types track applications: **Job application** and **PhD application**. A new setup has a collection of each under **Career**. To add one yourself, make a new collection in any space and choose the type: the name fills itself in.
+
+- **A board by status:** the collection opens as a Kanban board. Jobs go Interested, Preparing, Applied, Interviewing, Offer, Rejected, Withdrawn. PhDs go Researching, Contacted supervisor, Preparing, Submitted, Interview, Offer, Rejected, Withdrawn. Drag a card's grip, use its menu, or press Alt and an arrow key to move it. **Table**, **Calendar** and **Timeline** show the same applications in other ways.
+- **Fields:** jobs have company, deadline, next interview, location, work mode, salary, the job posting, where you found it, a contact, the date you applied and how much you want it. PhDs have university, deadline, interview, supervisor, research group, country, funding, stipend, start date, the programme page, when you contacted the supervisor, when you submitted and how much you want it. Each has room for free notes too.
+- **A checklist to start with:** a job starts with Tailor CV, Write cover letter and Send application. A PhD starts with CV, Research proposal, Motivation letter, two reference letters, Transcripts and certificates, and Language certificate. Change them as you like.
+- **Deadlines on Today:** the deadline shows on Today and the dashboard as "Apply: Data analyst · Spotify" until you've applied, and the interview date as "Interview: …" while you're waiting for it or in the interviews. After that they leave on their own, and a missed deadline isn't shown in red any more.
+- **Dates fill themselves in:** moving a job to Applied sets **Applied on** to today, and moving a PhD to Submitted sets **Submitted on**, unless they already have a date.
+- **Your own version:** in **Settings → Note types and custom fields**, **Duplicate to customize** makes a copy you can add fields to or change. The copy keeps the deadlines, the dates that fill in and the starting checklist.
 
 ## Where your data lives
 

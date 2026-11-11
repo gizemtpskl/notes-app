@@ -425,7 +425,7 @@ export const WIDGET_VIEWS = {
     }
     return card('Bored? Try this', null,
       h('a', { class: 'dash-idea', href: `#/note/${encodeURIComponent(pick.id)}` }, displayTitle(pick, type) || 'Untitled'),
-      h('div', { class: 'card-fields' }, summaryFields(type).map((field) => fieldDisplay(field, fieldValue(pick, field), { db, compact: true }))),
+      h('div', { class: 'card-fields' }, summaryFields(type).map((field) => fieldDisplay(field, fieldValue(pick, field), { db, compact: true, note: pick }))),
       h('div', { class: 'dash-row dash-another' },
         ideas.length > 1 && h('button', {
           class: 'btn btn-small',
@@ -455,7 +455,7 @@ export const WIDGET_VIEWS = {
     }
     return card('Tonight’s watch', null,
       h('a', { class: 'dash-idea', href: `#/note/${encodeURIComponent(pick.id)}` }, displayTitle(pick, type) || 'Untitled'),
-      h('div', { class: 'card-fields' }, summaryFields(type).map((field) => fieldDisplay(field, fieldValue(pick, field), { db, compact: true }))),
+      h('div', { class: 'card-fields' }, summaryFields(type).map((field) => fieldDisplay(field, fieldValue(pick, field), { db, compact: true, note: pick }))),
       candidates.length > 1 && h('div', { class: 'dash-row dash-another dash-watch-another' },
         h('button', {
           class: 'btn btn-small',

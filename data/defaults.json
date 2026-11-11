@@ -45,7 +45,9 @@
       "collections": [
         { "name": "Goals", "defaultTypeId": "goal" },
         { "name": "Meetings", "defaultTypeId": "meeting" },
-        { "name": "Reading list", "defaultTypeId": "link" }
+        { "name": "Reading list", "defaultTypeId": "link" },
+        { "name": "Job applications", "defaultTypeId": "jobApplication" },
+        { "name": "PhD applications", "defaultTypeId": "phdApplication" }
       ]
     },
     {

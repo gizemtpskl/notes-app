@@ -7,7 +7,7 @@ import { relativeDay, toDateStr } from '../data/dates.js';
 import { fieldValue } from '../data/fieldKinds.js';
 import { eventEntries, toggleEventDone } from '../data/googleCalendar.js';
 import { agendaBuckets, flatten, locate, progress, removeTask, toggleTask } from '../data/tasks.js';
-import { displayTitle, tasksFields } from '../data/types.js';
+import { agendaTitle, displayTitle, dueIsOpen, tasksFields } from '../data/types.js';
 import { fill, h } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
@@ -47,12 +47,12 @@ export function collectDeadlines(notes) {
       if (field.role === 'due') {
         const due = fieldValue(note, field);
         const progressField = type.fields.find((f) => f.id === 'progress');
-        const finished = progressField && fieldValue(note, progressField) >= 100;
+        const finished = (progressField && fieldValue(note, progressField) >= 100) || !dueIsOpen(note, type, field);
         if (due && !finished) {
           const title = displayTitle(note, type) || 'Untitled';
           entries.push({
             item: {
-              id: `${note.id}:${field.id}`, text: `${field.name}: ${title}`, due, done: false, priority: 0, children: [],
+              id: `${note.id}:${field.id}`, text: `${field.dueLabel ?? field.name}: ${agendaTitle(note, type)}`, due, done: false, priority: 0, children: [],
             },
             parent: null,
             noteId: note.id,

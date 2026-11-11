@@ -10,7 +10,7 @@ import { MOODS, emptyValue, fieldValue, isEmptyValue, valueToText } from '../dat
 import { safeUrl } from '../data/html.js';
 import { uid } from '../data/schema.js';
 import { progress } from '../data/tasks.js';
-import { displayTitle } from '../data/types.js';
+import { displayTitle, dueIsOpen } from '../data/types.js';
 import { h } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { pickNote } from './dialogs.js';
@@ -336,7 +336,7 @@ export function fieldForm({ note, type, db, onChange = () => {}, readOnly = fals
         const widget = taskListField({ field, value: values[field.id], onChange: set, readOnly });
         tasksWidgets.set(field.id, widget);
         return h('div', { class: 'ff ff-wide ff-tasks' },
-          !field.primary && h('h3', { class: 'ff-label' }, field.name),
+          !field.primary && h('h2', { class: 'ff-label' }, field.name),
           widget.el);
       }
       const editor = (EDITORS[field.kind] ?? textEditor)(id, field, values[field.id], set, ctx);
@@ -382,7 +382,7 @@ function stars(value, field) {
 }
 
 /** A value as an element, or null when empty. */
-export function fieldDisplay(field, value, { db, compact = false } = {}) {
+export function fieldDisplay(field, value, { db, compact = false, note = null } = {}) {
   if (isEmptyValue(field, value)) return null;
   switch (field.kind) {
     case 'rating': return stars(value, field);
@@ -395,7 +395,9 @@ export function fieldDisplay(field, value, { db, compact = false } = {}) {
     case 'checkbox': return h('span', { class: 'check-display', role: 'img', 'aria-label': field.name }, icon('check', 14));
     case 'date': {
       const today = toDateStr();
-      return h('time', { class: `date-display${field.role === 'due' && value < today ? ' is-overdue' : ''}`, datetime: value }, relativeDay(value, today));
+      // A deadline that no longer matters (the application was sent) isn't shown as late.
+      const late = field.role === 'due' && value < today && (!note || !db || dueIsOpen(note, db.getType(note.typeId), field));
+      return h('time', { class: `date-display${late ? ' is-overdue' : ''}`, datetime: value }, relativeDay(value, today));
     }
     case 'number': return h('span', { class: 'num-display' }, `${value.toLocaleString()}${field.unit ? ` ${field.unit}` : ''}`);
     case 'url': {

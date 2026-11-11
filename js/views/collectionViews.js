@@ -64,7 +64,7 @@ export function tableView(notes, type, { sort, onSort, selection }) {
     ...tableFields(type).map((field) => ({
       key: `field:${field.id}`,
       label: field.name,
-      cell: (note) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true }),
+      cell: (note) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true, note }),
     })),
     {
       key: 'tags',
@@ -122,7 +122,7 @@ function cardBody(note, type) {
       note.favorite && h('span', { class: 'note-flag', title: 'Favorite' }, icon('star', 13)),
       h('span', { class: note.title || title !== 'Untitled' ? '' : 'is-untitled' }, title)),
     h('span', { class: 'card-fields' },
-      summaryFields(type).map((field) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true })),
+      summaryFields(type).map((field) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true, note })),
       tagChips(note)),
     preview && preview !== title && h('span', { class: 'card-preview' }, preview),
   ];

@@ -46,7 +46,7 @@ import {
   nextOccurrence, normalizeTasks, outdentTask, progress, removeTask, shiftTask, toggleTask, updateTask,
 } from '../data/tasks.js';
 import {
-  BUILTIN_TYPES, autoTitleFor, cleanType, displayTitle, isBlankNote, noteDueDate, noteWords, viewsFor,
+  BUILTIN_TYPES, agendaTitle, autoTitleFor, cleanType, displayTitle, dueIsOpen, isBlankNote, noteDueDate, noteWords, viewsFor,
 } from '../data/types.js';
 import { IndexedDbAdapter, LocalStorageAdapter, MemoryAdapter } from '../data/storage.js';
 import { fold, safeFileName, snippet, splitCapture, tokenize } from '../data/text.js';
@@ -4542,6 +4542,93 @@ describe('Tidy up', () => {
     const started = performance.now();
     findDuplicateGroups(db.listNotes(), (id) => db.getType(id));
     assert(performance.now() - started < 1500, `${performance.now() - started} ms`);
+  });
+});
+
+describe('Application trackers', () => {
+  it('opens job and PhD applications as a board by status', async () => {
+    const db = await freshDb();
+    for (const id of ['jobApplication', 'phdApplication']) {
+      const type = db.getType(id);
+      equal(type.defaultView, 'kanban');
+      assert(viewsFor(type).includes('kanban') && viewsFor(type).includes('table') && viewsFor(type).includes('calendar'), id);
+      equal(type.groupBy, 'status');
+    }
+  });
+
+  it('starts each application with its own checklist', async () => {
+    const db = await freshDb();
+    const a = db.createNote({ typeId: 'phdApplication', title: 'PhD in ML' });
+    const b = db.createNote({ typeId: 'phdApplication', title: 'PhD in NLP' });
+    const tasks = (note) => flatten(fieldValue(note, db.getType('phdApplication').fields.find((f) => f.id === 'documents'))).map(({ item }) => item);
+    equal(tasks(a).map((t) => t.text).slice(0, 3), ['CV', 'Research proposal', 'Motivation letter']);
+    const ids = [...tasks(a), ...tasks(b)].map((t) => t.id);
+    equal(new Set(ids).size, ids.length, 'task ids are never shared between notes');
+    equal(fieldValue(a, db.getType('phdApplication').fields.find((f) => f.id === 'status')), 'Researching');
+  });
+
+  it('counts an untouched application as blank, and a ticked one as not', async () => {
+    const db = await freshDb();
+    const type = db.getType('jobApplication');
+    const note = db.createNote({ typeId: 'jobApplication' });
+    assert(isBlankNote(note, type), 'untouched');
+    const [first] = fieldValue(note, type.fields.find((f) => f.id === 'todo'));
+    db.updateTasks(note.id, 'todo', (items) => updateTask(items, first.id, { done: true }));
+    assert(!isBlankNote(db.getNote(note.id), type), 'ticked');
+  });
+
+  it('only keeps a deadline while it still matters', async () => {
+    const db = await freshDb();
+    const type = db.getType('jobApplication');
+    const deadline = type.fields.find((f) => f.id === 'deadline');
+    const interview = type.fields.find((f) => f.id === 'interview');
+    const note = db.createNote({ typeId: 'jobApplication', title: 'Analyst', fields: { deadline: '2026-11-20', interview: '2026-12-01' } });
+    assert(dueIsOpen(note, type, deadline) && !dueIsOpen(note, type, interview), 'interested: the deadline counts');
+    equal(noteDueDate(note, type), '2026-11-20');
+    const applied = db.updateNote(note.id, { fields: { ...note.fields, status: 'Applied' } });
+    assert(!dueIsOpen(applied, type, deadline) && dueIsOpen(applied, type, interview), 'applied: the interview counts');
+    equal(noteDueDate(applied, type), '2026-12-01');
+    const rejected = db.updateNote(note.id, { fields: { ...applied.fields, status: 'Rejected' } });
+    equal(noteDueDate(rejected, type), '', 'nothing left to do');
+    assert(dueIsOpen(db.createNote({ typeId: 'goal' }), db.getType('goal'), db.getType('goal').fields.find((f) => f.id === 'deadline')), 'other deadlines always count');
+  });
+
+  it('fills in the date when an application is sent, once', async () => {
+    const db = await freshDb();
+    const note = db.createNote({ typeId: 'jobApplication', title: 'Analyst' });
+    const applied = db.updateNote(note.id, { fields: { ...note.fields, status: 'Applied' } }, { now: new Date(2026, 10, 11, 9).getTime() });
+    equal(applied.fields.appliedOn, '2026-11-11');
+    const moved = db.updateNote(note.id, { fields: { ...applied.fields, status: 'Interviewing' } }, { now: new Date(2026, 10, 20, 9).getTime() });
+    const back = db.updateNote(note.id, { fields: { ...moved.fields, status: 'Applied' } }, { now: new Date(2026, 10, 21, 9).getTime() });
+    equal(back.fields.appliedOn, '2026-11-11', 'a date already there is kept');
+    const phd = db.createNote({ typeId: 'phdApplication', fields: { status: 'Submitted', submittedOn: '2026-10-01' } });
+    equal(db.updateNote(phd.id, { fields: { ...phd.fields, status: 'Submitted' } }).fields.submittedOn, '2026-10-01', 'no change, no stamp');
+    const other = db.updateNote(phd.id, { fields: { ...phd.fields, status: 'Preparing' } });
+    const submitted = db.updateNote(phd.id, { fields: { ...other.fields, submittedOn: '', status: 'Submitted' } }, { now: new Date(2026, 10, 12, 9).getTime() });
+    equal(submitted.fields.submittedOn, '2026-11-12');
+  });
+
+  it('names an application with its company in agendas', async () => {
+    const db = await freshDb();
+    const type = db.getType('jobApplication');
+    equal(agendaTitle(db.createNote({ typeId: 'jobApplication', title: 'Data analyst', fields: { company: 'Spotify' } }), type), 'Data analyst · Spotify');
+    equal(agendaTitle(db.createNote({ typeId: 'jobApplication', title: 'Data analyst' }), type), 'Data analyst');
+    equal(agendaTitle(db.createNote({ typeId: 'goal', title: 'Run' }), db.getType('goal')), 'Run');
+  });
+
+  it('keeps the tracker settings in a copied type, also through a backup', async () => {
+    const db = await freshDb();
+    const copy = db.duplicateType('jobApplication');
+    const cleaned = cleanType(JSON.parse(JSON.stringify(copy)));
+    const field = (id) => cleaned.fields.find((f) => f.id === id);
+    equal(field('deadline').role, 'due');
+    equal(field('deadline').openWhile, { field: 'status', values: ['', 'Interested', 'Preparing'] });
+    equal(field('deadline').dueLabel, 'Apply');
+    equal(field('status').stamps, { Applied: 'appliedOn' });
+    equal(field('status').default, 'Interested');
+    equal(field('todo').starter, ['Tailor CV', 'Write cover letter', 'Send application']);
+    const junk = cleanType({ id: 'x', name: 'x', fields: [{ id: 'd', kind: 'text', role: 'due', openWhile: 'nope', starter: [1] }, { id: 's', kind: 'select', stamps: [1] }] });
+    assert(!junk.fields[0].role && !junk.fields[0].openWhile && !junk.fields[0].starter && !junk.fields[1].stamps, 'junk is dropped');
   });
 });
 

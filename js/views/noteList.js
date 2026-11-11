@@ -99,7 +99,7 @@ export function noteList(notes, options = {}) {
     const preview = snippet(previewText(note, type), 120);
     const location = showLocation ? locationName(note) : null;
     const chips = [
-      ...summaryFields(type).map((field) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true })),
+      ...summaryFields(type).map((field) => fieldDisplay(field, fieldValue(note, field), { db: app.db, compact: true, note })),
       ...tagChips(note),
     ].filter(Boolean);
     return h('li', { class: `note-row${selecting && selection.isSelected(note.id) ? ' is-selected' : ''}`, dataset: { id: note.id } },

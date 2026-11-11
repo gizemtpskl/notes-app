@@ -55,7 +55,7 @@ export function openPicker(notes, type) {
           h('h3', { class: 'pick-title' }, displayTitle(pick, type) || 'Untitled'),
           h('div', { class: 'card-fields' }, summaryFields(type)
             .filter((f) => f.id !== picker.field)
-            .map((field) => fieldDisplay(field, fieldValue(pick, field), { db: app.db, compact: true }))),
+            .map((field) => fieldDisplay(field, fieldValue(pick, field), { db: app.db, compact: true, note: pick }))),
           h('div', { class: 'pick-actions' },
             h('button', { class: 'btn', type: 'button', onClick: showPick, disabled: candidates.length < 2 }, icon('shuffle', 15), 'Another one'),
             picker.done && h('button', {
