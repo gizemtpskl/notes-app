@@ -297,10 +297,12 @@ export function findTask(db, ref) {
 /**
  * Open tasks that don't have a time on the timetable today or later, soonest due first:
  * [{ item, noteId, fieldId, noteTitle }]. A task scheduled on a past day and not done comes back.
+ * A task with its own time today or later is already on the grid, so it isn't listed.
  */
 export function tasksToSchedule(db, today = toDateStr()) {
   const scheduled = new Set(db.listBlocks().filter((b) => b.task && b.date >= today).map((b) => b.task.taskId));
-  const all = collectTasks(allTaskNotes()).filter((entry) => !entry.item.done && !scheduled.has(entry.item.id));
+  const timed = (item) => Boolean(item.time) && item.due >= today;
+  const all = collectTasks(allTaskNotes()).filter((entry) => !entry.item.done && !scheduled.has(entry.item.id) && !timed(entry.item));
   return all.sort((a, b) => (a.item.due || '9999').localeCompare(b.item.due || '9999') || (b.item.priority ?? 0) - (a.item.priority ?? 0));
 }
 

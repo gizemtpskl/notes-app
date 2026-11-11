@@ -6,10 +6,17 @@
  * On a phone the page opens on one day, and swiping sideways moves between days.
  * With a mouse, blocks can be drawn, moved and resized on the grid (see gridDrag.js), and tasks
  * from the task list dropped onto it.
+ *
+ * Besides blocks, the grid shows two other things, each as itself rather than a copy:
+ *   - tasks with a date and a time, from any note. Ticking or dragging one here changes the task.
+ *   - Google Calendar events, when the calendar is connected. They're only read: clicking one opens
+ *     it in Google Calendar. The copy from the last look is shown while offline or signed out.
  */
 import { app } from '../context.js';
+import { weekEvents } from '../data/calendarTimetable.js';
 import { addDays, daysBetween, firstDayOfWeek, formatDay, isDateStr, toDateStr } from '../data/dates.js';
-import { toggleTask } from '../data/tasks.js';
+import { calendarConfig } from '../data/googleCalendar.js';
+import { toggleTask, updateTask } from '../data/tasks.js';
 import {
   blockMinutes, changeFromSeries, conflictsWith, findConflicts, isoWeek, layoutDay, occurrencesBetween, parseBlockText,
   shiftSeriesDay, startOfWeek, toMinutes, weekday,
@@ -21,13 +28,18 @@ import { toast } from '../ui/toast.js';
 import {
   askScope, openBlockDialog, openTimetableSettings, typeLabel, weekdayName,
 } from './blockDialog.js';
+import { onCalendarStatus, refreshWeekEvents } from './calendarConnection.js';
+import { calendarStatusLine } from './calendarSettings.js';
 import { attachGridDrag, clockOf, taskHandleDrag } from './gridDrag.js';
 import { emptyState } from './noteList.js';
+import { allTaskNotes, collectTasks } from './tasksAgenda.js';
 import {
   TASK_LIMIT, exportIcs, findTask, importIcs, openFreeTimeDialog, tasksToSchedule, weekSummaryView,
 } from './timetableTools.js';
 
 const HOUR_PX = 48;
+/** How long a task with a time looks on the grid. The same length its calendar event gets. */
+const TASK_MINUTES = 30;
 const SNAP = 15;
 const VIEWS = [['week', 'Week'], ['day', 'Day'], ['agenda', 'Agenda']];
 const narrow = () => window.matchMedia('(max-width: 720px)').matches;
@@ -49,6 +61,42 @@ export function loadOccurrences(db, from, to) {
   return occurrencesBetween(db.listBlocks(), from, to, lookups(db));
 }
 
+/**
+ * Tasks with a date and a time between two dates, as grid items:
+ *   { kind: 'task', key, date, start, end, title, done, color, ref: { noteId, fieldId, taskId }, noteTitle }
+ * A task that has a block among `occurrences` shows as that block instead.
+ */
+export function timedTaskItems(db, from, to, occurrences = []) {
+  const withBlocks = new Set(occurrences.filter((o) => o.task && !o.cancelled).map((o) => o.task.taskId));
+  return collectTasks(allTaskNotes())
+    .filter(({ item }) => item.time && item.due >= from && item.due <= to && !withBlocks.has(item.id))
+    .map((entry) => ({
+      kind: 'task',
+      key: `task:${entry.item.id}`,
+      date: entry.item.due,
+      start: entry.item.time,
+      end: clockOf(Math.min(toMinutes(entry.item.time) + TASK_MINUTES, 24 * 60 - 1)),
+      title: entry.item.text || 'Task',
+      done: Boolean(entry.item.done),
+      color: db.getSpace(db.getNote(entry.noteId)?.spaceId)?.color ?? 'slate',
+      ref: { noteId: entry.noteId, fieldId: entry.fieldId, taskId: entry.item.id },
+      noteTitle: entry.noteTitle,
+    }));
+}
+
+/** Google Calendar's events between two dates, as last read: { kind: 'event', allDay, ... }. */
+export function calendarEventItems(db, from, to) {
+  const config = calendarConfig(db);
+  if (!config.on || !config.showEvents) return [];
+  return weekEvents(db, from, to).map((piece) => ({ ...piece, kind: 'event' }));
+}
+
+/** Everything with a time between two dates: blocks, tasks and events. For free time and clashes. */
+export function busyBetween(db, from, to) {
+  const occurrences = loadOccurrences(db, from, to);
+  return [...occurrences, ...timedTaskItems(db, from, to, occurrences), ...calendarEventItems(db, from, to).filter((e) => !e.allDay)];
+}
+
 function parseQuery(query) {
   const params = new URLSearchParams(query ?? '');
   const date = params.get('date');
@@ -67,6 +115,7 @@ export function timetableView({ query } = {}) {
   let clock = null;
   let showTasks = db.getSettings().timetableTasks === true;
   let shown = new Map();
+  let eventsShown = false;
   let geom = { pxPerMinute: HOUR_PX / 60, firstMinute: 0 };
   const hoursSetting = () => ({ start: 7, end: 22, ...db.getSettings().timetableHours });
 
@@ -171,6 +220,69 @@ export function timetableView({ query } = {}) {
       resize);
   }
 
+  /** A task with a time: its checkbox, and a button that opens its note. It can be dragged to move it. */
+  function taskItemView(t, positioned) {
+    const short = blockMinutes(t) < 45;
+    const content = [
+      h('span', { class: 'tt-block-title' }, t.done && [h('span', { class: 'tt-tag' }, 'Done'), ' '], t.title),
+      h('span', { class: 'sr-only' }, `, ${weekdayName(t.date)}`),
+      h('span', { class: 'tt-block-meta' }, ` ${t.start}`, h('span', { class: 'sr-only' }, `, task in ${t.noteTitle}`)),
+    ];
+    return h('div', {
+      class: `tt-block is-task is-timed-task${short ? ' is-short' : ''}${t.done ? ' is-done' : ''}`, dataset: { key: t.key, color: t.color }, cssVars: positioned,
+    },
+    h('input', {
+      class: 'tt-task-check',
+      type: 'checkbox',
+      checked: t.done,
+      'aria-label': `${t.done ? 'Mark not done' : 'Mark done'}: ${t.title}`,
+      onChange: () => db.updateTasks(t.ref.noteId, t.ref.fieldId, (items) => toggleTask(items, t.ref.taskId, { today: toDateStr() })),
+    }),
+    h('button', {
+      class: 'tt-block-open tt-focus',
+      type: 'button',
+      dataset: { key: t.key, date: t.date, start: t.start },
+      title: `${t.title} · ${t.start} · task in ${t.noteTitle}`,
+      onClick: () => {
+        location.hash = `#/note/${encodeURIComponent(t.ref.noteId)}`;
+      },
+      onKeydown: (event) => moveFocus(event, t),
+    }, content));
+  }
+
+  /** An event from Google Calendar. Clicking it opens it there, in a new tab. */
+  function eventView(e, positioned) {
+    const short = blockMinutes(e) < 45;
+    const content = [
+      h('span', { class: 'tt-block-title' }, e.title),
+      h('span', { class: 'sr-only' }, `, ${weekdayName(e.date)}`),
+      h('span', { class: 'tt-block-meta' }, ` ${e.start}`, timeTo(), e.end, h('span', { class: 'sr-only' }, ', Google Calendar')),
+    ];
+    const props = {
+      class: `tt-block tt-focus is-event${short ? ' is-short' : ''}`,
+      dataset: { key: e.key, date: e.date, start: e.start },
+      cssVars: positioned,
+      title: `${e.title} · ${e.start}–${e.end} · Google Calendar`,
+      onKeydown: (event) => moveFocus(event, e),
+    };
+    return e.url
+      ? h('a', {
+        ...props, href: e.url, target: '_blank', rel: 'noopener noreferrer',
+      }, content)
+      : h('div', { ...props, tabindex: '0' }, content);
+  }
+
+  /** All-day events, under the day's name. */
+  function allDayList(events) {
+    if (!events.length) return null;
+    return h('ul', { class: 'tt-allday', 'aria-label': 'All day' }, events.map((e) => h('li', null,
+      e.url
+        ? h('a', {
+          class: 'tt-allday-item', href: e.url, target: '_blank', rel: 'noopener noreferrer', title: `${e.title} · all day · Google Calendar`,
+        }, e.title, h('span', { class: 'sr-only' }, ', all day, Google Calendar'))
+        : h('span', { class: 'tt-allday-item' }, e.title, h('span', { class: 'sr-only' }, ', all day, Google Calendar')))));
+  }
+
   /** Arrow keys between blocks: up and down within a day, left and right to the nearest on another day. */
   function moveFocus(event, o) {
     const keys = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
@@ -199,18 +311,25 @@ export function timetableView({ query } = {}) {
     target?.focus();
   }
 
-  function dayHeader(date, today) {
+  function dayHeader(date, today, allDay) {
     const isToday = date === today;
     return h('div', { class: `tt-day-head${isToday ? ' is-today' : ''}` },
       h('span', { class: 'tt-day-name' }, formatDay(date, { weekday: 'short' })),
       h('span', { class: 'tt-day-date' }, formatDay(date, { day: 'numeric' })),
-      isToday && h('span', { class: 'tt-today-tag' }, 'Today'));
+      isToday && h('span', { class: 'tt-today-tag' }, 'Today'),
+      allDayList(allDay.filter((e) => e.date === date)));
   }
 
-  function grid(days, occurrences, today) {
+  function itemView(item, positioned, conflicted) {
+    if (item.kind === 'task') return taskItemView(item, positioned);
+    if (item.kind === 'event') return eventView(item, positioned);
+    return blockButton(item, { positioned, conflicted });
+  }
+
+  function grid(days, items, allDay, today) {
     const settings = db.getSettings();
     const hours = { start: 7, end: 22, ...settings.timetableHours };
-    const live = occurrences;
+    const live = items;
     // Stretch to fit anything outside the chosen hours, so nothing is ever hidden.
     const earliest = Math.min(hours.start * 60, ...live.map((o) => toMinutes(o.start)));
     const latest = Math.max(hours.end * 60, ...live.map((o) => toMinutes(o.end)));
@@ -228,15 +347,12 @@ export function timetableView({ query } = {}) {
       const layout = layoutDay(mine);
       const blocks = mine.map((o) => {
         const lane = layout.get(o.key) ?? { lane: 0, lanes: 1 };
-        return blockButton(o, {
-          positioned: {
-            '--top': `${(toMinutes(o.start) - first * 60) * pxPerMinute}px`,
-            '--height': `${Math.max(18, blockMinutes(o) * pxPerMinute - 2)}px`,
-            '--lane': lane.lane,
-            '--lanes': lane.lanes,
-          },
-          conflicted: conflicted.has(o.key),
-        });
+        return itemView(o, {
+          '--top': `${(toMinutes(o.start) - first * 60) * pxPerMinute}px`,
+          '--height': `${Math.max(18, blockMinutes(o) * pxPerMinute - 2)}px`,
+          '--lane': lane.lane,
+          '--lanes': lane.lanes,
+        }, conflicted.has(o.key));
       });
       const nowMinutes = toMinutes(nowTime());
       const showNow = date === today && nowMinutes >= first * 60 && nowMinutes <= last * 60;
@@ -261,32 +377,68 @@ export function timetableView({ query } = {}) {
       class: `tt-scroll${days.length === 1 ? ' is-day' : ''}`, tabindex: '-1', role: 'region', 'aria-label': mode === 'day' ? 'Day' : 'Week',
     },
     h('div', { class: `tt-grid tt-days-${days.length}`, cssVars: { '--rows': last - first, '--hour': `${HOUR_PX}px` } },
-    h('div', { class: 'tt-head' }, h('div', { class: 'tt-corner' }), days.map((date) => dayHeader(date, today))),
+    h('div', { class: 'tt-head' }, h('div', { class: 'tt-corner' }), days.map((date) => dayHeader(date, today, allDay))),
     h('div', { class: 'tt-main' }, labels, columns)));
   }
 
-  function agenda(days, occurrences, today) {
-    const withBlocks = days.filter((date) => occurrences.some((o) => o.date === date));
-    if (!withBlocks.length) {
+  function agendaRow(item) {
+    if (item.kind === 'task') {
+      return h('li', { class: 'tt-agenda-item' },
+        h('input', {
+          class: 'tt-agenda-check',
+          type: 'checkbox',
+          checked: item.done,
+          'aria-label': `${item.done ? 'Mark not done' : 'Mark done'}: ${item.title}`,
+          onChange: () => db.updateTasks(item.ref.noteId, item.ref.fieldId, (items) => toggleTask(items, item.ref.taskId, { today: toDateStr() })),
+        }),
+        h('a', {
+          class: `tt-agenda-row is-task${item.done ? ' is-done' : ''}`, href: `#/note/${encodeURIComponent(item.ref.noteId)}`, dataset: { color: item.color, key: item.key },
+        },
+        h('span', { class: 'tt-agenda-time' }, item.start),
+        h('span', { class: 'tt-agenda-main' },
+          h('span', { class: 'tt-agenda-title' }, item.title),
+          h('span', { class: 'tt-agenda-meta' }, `Task · ${item.noteTitle}`))));
+    }
+    if (item.kind === 'event') {
+      const inner = [
+        h('span', { class: 'tt-agenda-time' }, item.allDay ? 'All day' : [item.start, timeTo(), item.end]),
+        h('span', { class: 'tt-agenda-main' },
+          h('span', { class: 'tt-agenda-title' }, item.title),
+          h('span', { class: 'tt-agenda-meta' }, 'Google Calendar'))];
+      return h('li', null, item.url
+        ? h('a', {
+          class: 'tt-agenda-row is-event', href: item.url, target: '_blank', rel: 'noopener noreferrer', dataset: { key: item.key },
+        }, inner)
+        : h('div', { class: 'tt-agenda-row is-event', dataset: { key: item.key } }, inner));
+    }
+    const o = item;
+    return h('li', null,
+      h('button', {
+        class: `tt-agenda-row${o.cancelled ? ' is-cancelled' : ''}`,
+        type: 'button',
+        dataset: { color: o.color, key: o.key },
+        onClick: () => openBlockDialog({ blockId: o.blockId, originalDate: o.originalDate }),
+      },
+      h('span', { class: 'tt-agenda-time' }, o.start, timeTo(), o.end),
+      h('span', { class: 'tt-agenda-main' },
+        h('span', { class: 'tt-agenda-title' }, o.cancelled && [h('span', { class: 'tt-tag' }, 'Cancelled'), ' '], o.title),
+        h('span', { class: 'tt-agenda-meta' }, [o.type !== 'other' && typeLabel(o.type), o.location].filter(Boolean).join(' · ')))));
+  }
+
+  function agenda(days, items, allDay, today) {
+    const all = [...allDay, ...items];
+    const withItems = days.filter((date) => all.some((o) => o.date === date));
+    if (!withItems.length) {
       return emptyState({
         emoji: '🗓️',
         title: 'Nothing this week',
         text: 'Type a block above, like “German Tue 18:15-20:00”, or use New block.',
       });
     }
-    return h('div', { class: 'tt-agenda' }, withBlocks.map((date) => h('section', { class: 'tt-agenda-day' },
+    const order = (a, b) => Number(Boolean(b.allDay)) - Number(Boolean(a.allDay)) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
+    return h('div', { class: 'tt-agenda' }, withItems.map((date) => h('section', { class: 'tt-agenda-day' },
       h('h2', { class: `section-title${date === today ? ' is-today' : ''}` }, formatDay(date, { weekday: 'long', month: 'long', day: 'numeric' }), date === today && ' · Today'),
-      h('ul', { class: 'tt-agenda-list' }, occurrences.filter((o) => o.date === date).map((o) => h('li', null,
-        h('button', {
-          class: `tt-agenda-row${o.cancelled ? ' is-cancelled' : ''}`,
-          type: 'button',
-          dataset: { color: o.color, key: o.key },
-          onClick: () => openBlockDialog({ blockId: o.blockId, originalDate: o.originalDate }),
-        },
-        h('span', { class: 'tt-agenda-time' }, o.start, timeTo(), o.end),
-        h('span', { class: 'tt-agenda-main' },
-          h('span', { class: 'tt-agenda-title' }, o.cancelled && [h('span', { class: 'tt-tag' }, 'Cancelled'), ' '], o.title),
-          h('span', { class: 'tt-agenda-meta' }, [o.type !== 'other' && typeLabel(o.type), o.location].filter(Boolean).join(' · '))))))))));
+      h('ul', { class: 'tt-agenda-list' }, all.filter((o) => o.date === date).sort(order).map(agendaRow)))));
   }
 
   function render(focusSelector) {
@@ -294,7 +446,14 @@ export function timetableView({ query } = {}) {
     const [from, to] = span();
     const days = Array.from({ length: mode === 'day' ? 1 : 7 }, (_, i) => addDays(from, i));
     const occurrences = loadOccurrences(db, from, to);
-    shown = new Map(occurrences.map((o) => [o.key, o]));
+    const tasks = timedTaskItems(db, from, to, occurrences);
+    const events = calendarEventItems(db, from, to);
+    const allDay = events.filter((e) => e.allDay);
+    const items = [...occurrences, ...tasks, ...events.filter((e) => !e.allDay)];
+    eventsShown = calendarConfig(db).on && calendarConfig(db).showEvents;
+    // Blocks and tasks can be dragged; events belong to Google Calendar and stay put.
+    shown = new Map([...occurrences, ...tasks].map((o) => [o.key, o]));
+    refreshWeekEvents(startOfWeek(anchor, weekStart()));
     const active = body.contains(document.activeElement) ? document.activeElement : null;
     const focusKey = active?.closest('[data-key]')?.dataset.key ?? null;
     const focusCheck = Boolean(active?.classList.contains('tt-task-check'));
@@ -325,7 +484,7 @@ export function timetableView({ query } = {}) {
 
     tasksButton.setAttribute('aria-pressed', String(showTasks));
     const main = [
-      mode === 'agenda' ? agenda(days, occurrences, today) : grid(days, occurrences, today),
+      mode === 'agenda' ? agenda(days, items, allDay, today) : grid(days, items, allDay, today),
       mode !== 'agenda' && !db.listBlocks().length && h('p', { class: 'empty-line tt-hint' }, 'Click or drag on an empty part of the grid, type a block above, or use New block.'),
     ];
     fill(body,
@@ -414,7 +573,17 @@ export function timetableView({ query } = {}) {
 
   // -- Dragging on the grid --------------------------------------------------------------
 
+  /** A task dragged on the grid gets the new day and time. */
+  function moveTask(t, next) {
+    const { undo } = db.undoable(() => db.updateTasks(t.ref.noteId, t.ref.fieldId, (items) => updateTask(items, t.ref.taskId, { due: next.date, time: next.start })));
+    toast(`Moved to ${formatDay(next.date, { weekday: 'short' })} ${next.start}`, { undo });
+  }
+
   async function applyChange(o, next) {
+    if (o.kind === 'task') {
+      moveTask(o, next);
+      return;
+    }
     const block = db.getBlock(o.blockId);
     if (!block) {
       render();
@@ -500,7 +669,7 @@ export function timetableView({ query } = {}) {
           openFreeTimeDialog({
             from,
             hours: hoursSetting(),
-            occurrencesFor: (a, b) => loadOccurrences(db, a, b),
+            occurrencesFor: (a, b) => busyBetween(db, a, b),
             onPick: (slot) => openBlockDialog({ draft: { date: slot.date, start: slot.start, end: clockOf(Math.min(toMinutes(slot.start) + 60, toMinutes(slot.end))) } }),
           });
         },
@@ -541,6 +710,11 @@ export function timetableView({ query } = {}) {
     },
   });
 
+  // Signed out or a problem with Google Calendar: said here too, with a button to sign in.
+  const calendarLine = calendarStatusLine();
+  // Once signed in, the week on screen is read from Google.
+  const stopCalendar = onCalendarStatus(() => refreshWeekEvents(startOfWeek(anchor, weekStart())));
+
   const el = h('div', { class: 'page page-wide timetable' },
     h('header', { class: 'page-head' },
       rangeLabel,
@@ -556,6 +730,7 @@ export function timetableView({ query } = {}) {
             onClick: () => openBlockDialog({ draft: { date: mode === 'day' ? anchor : (anchor >= span()[0] ? anchor : span()[0]), start: '09:00', end: '10:00' } }),
           }, icon('plus', 16), 'New block')))),
     h('div', { class: 'task-add-row tt-quick' }, icon('plus', 16), quickAdd),
+    calendarLine.el,
     h('div', { class: 'tt-toolbar' },
       h('div', { class: 'tt-nav' },
         prevButton,
@@ -578,11 +753,18 @@ export function timetableView({ query } = {}) {
       }, 60000);
     },
     update: (change) => {
-      const tasksMatter = showTasks || db.listBlocks().some((b) => b.task);
+      // A drag in progress redraws when it ends.
+      if (body.classList.contains('is-dragging')) return;
+      const config = calendarConfig(db);
+      const eventsChanged = change.ids.has('gcalWeeks') || (change.ids.has('gcalConfig') && (config.on && config.showEvents) !== eventsShown);
       if (change.stores.has('timeBlocks') || change.stores.has('semesters') || change.stores.has('spaces') || change.ids.has('settings')
-        || (tasksMatter && change.stores.has('notes'))) render();
+        || change.stores.has('notes') || eventsChanged) render();
     },
-    destroy: () => clearInterval(clock),
+    destroy: () => {
+      clearInterval(clock);
+      calendarLine.destroy();
+      stopCalendar();
+    },
   };
 }
 

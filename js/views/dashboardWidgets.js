@@ -15,6 +15,7 @@ import { entryDate, streaks } from '../data/journal.js';
 import { donePatch, pickOne, pickerCandidates } from '../data/picker.js';
 import { reviewQueue } from '../data/review.js';
 import { dayAgenda, weekAgenda } from '../data/agenda.js';
+import { weekEventEntries } from '../data/calendarTimetable.js';
 import { eventEntries } from '../data/googleCalendar.js';
 import { flatten } from '../data/tasks.js';
 import { findDuplicateGroups, findEmptyNotes, findStaleNotes } from '../data/tidy.js';
@@ -27,6 +28,7 @@ import { newNote, withUndo } from './actions.js';
 import { collectCards } from './courseViews.js';
 import { fieldDisplay } from './fieldWidgets.js';
 import { openHabitsDialog } from './habitsDialog.js';
+import { refreshWeekEvents } from './calendarConnection.js';
 import { noteList } from './noteList.js';
 import { homeForType } from './palette.js';
 import { openQuiz } from './quiz.js';
@@ -34,7 +36,7 @@ import {
   agendaRow, allTaskNotes, collectDeadlines, collectTasks, globalBuckets, tickTask,
 } from './tasksAgenda.js';
 import { progressBar } from './tasksField.js';
-import { loadOccurrences } from './timetable.js';
+import { calendarEventItems, loadOccurrences } from './timetable.js';
 import { exportBackup } from './transfer.js';
 
 // Fewer rows on a phone, so the first four widgets fit on the first screen.
@@ -158,7 +160,10 @@ export const WIDGET_VIEWS = {
   week({ db, today }) {
     const from = weekFrom(db, today);
     const to = addDays(from, 6);
-    const { days, totals } = weekAgenda({ occurrences: loadOccurrences(db, from, to), entries: agendaEntries(db, today) }, from, today);
+    // Google Calendar's events for the rest of the week, as last read. Today's come with the day's own.
+    refreshWeekEvents(from);
+    const entries = [...agendaEntries(db, today), ...(calendarEventItems(db, from, to).length ? weekEventEntries(db, from, to, today) : [])];
+    const { days, totals } = weekAgenda({ occurrences: loadOccurrences(db, from, to), entries }, from, today);
     const habits = db.listHabits();
     const elapsed = days.filter((d) => d.date <= today);
     const habitTicks = habits.reduce((sum, habit) => sum + elapsed.filter((d) => habit.done[d.date]).length, 0);
@@ -167,7 +172,7 @@ export const WIDGET_VIEWS = {
       return allClear('Your week', '#/timetable', 'Nothing planned this week yet.');
     }
     const hours = (minutes) => `${(minutes / 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} h`;
-    const mark = (item) => (item.kind === 'deadline' ? '⚑ ' : item.kind === 'block' ? '' : item.done ? '✓ ' : '○ ');
+    const mark = (item) => (item.kind === 'deadline' ? '⚑ ' : item.kind === 'block' || item.kind === 'event' ? '' : item.done ? '✓ ' : '○ ');
     const stat = (value, label) => h('div', { class: 'week-stat' }, h('span', { class: 'week-stat-value' }, value), h('span', { class: 'week-stat-label' }, label));
     return card(`Your week · ${formatDay(from, { month: 'short', day: 'numeric' })} – ${formatDay(to, { month: 'short', day: 'numeric' })}`, '#/timetable',
       h('ol', { class: 'week-days' }, days.map((day) => {

@@ -48,6 +48,7 @@ const FILES = [
   'js/data/flashcards.js',
   'js/data/googleCalendar.js',
   'js/data/googleErrors.js',
+  'js/data/calendarTimetable.js',
   'js/data/habits.js',
   'js/data/html.js',
   'js/data/ics.js',

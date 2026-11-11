@@ -27,6 +27,10 @@ import {
   CalendarAuthError, CalendarError, calendarConfig, createCalendarApi, eventBody, eventEntries, eventIdFor, isClientId, planSync, readEvent,
   removeAllEvents, runSync, saveEvents, syncLinks, syncableTasks, toggleEventDone, updateCalendarConfig,
 } from '../data/googleCalendar.js';
+import {
+  blockEventBody, blockEventId, blockLinks, blockWindow, clearWeekEvents, readRangeEvents, removeAllBlockEvents, runBlockSync, saveWeekEvents,
+  weekEventEntries, weekEvents,
+} from '../data/calendarTimetable.js';
 import { googleErrorReason } from '../data/googleErrors.js';
 import { NotesDb } from '../data/db.js';
 import { emptyModel, learn, suggest } from '../data/filing.js';
@@ -2116,6 +2120,12 @@ describe('Google Calendar', () => {
         if (failure) throw failure;
         events.set(id, body);
       },
+      async update(id, body) {
+        calls.push(['update', id]);
+        const failure = failOn('update', id, body);
+        if (failure) throw failure;
+        events.set(id, body);
+      },
       async remove(id) {
         calls.push(['remove', id]);
         const failure = failOn('remove', id);
@@ -2442,6 +2452,265 @@ describe('Google Calendar', () => {
     equal(new Date(asked.searchParams.get('timeMin')).getTime(), new Date(2026, 10, 9).getTime());
     equal(new Date(asked.searchParams.get('timeMax')).getTime(), new Date(2026, 10, 10).getTime());
     equal(asked.searchParams.get('singleEvents'), 'true');
+  });
+});
+
+describe('Google Calendar and the timetable', () => {
+  const TODAY = '2026-11-11'; // a Wednesday
+  const ZONE = 'Europe/Berlin';
+
+  function fakeApi(failOn = () => null) {
+    const events = new Map();
+    const calls = [];
+    return {
+      events,
+      calls,
+      async put(id, body) {
+        calls.push(['put', id]);
+        const failure = failOn('put', id, body, calls.length);
+        if (failure) throw failure;
+        events.set(id, body);
+      },
+      async update(id, body) {
+        calls.push(['update', id]);
+        const failure = failOn('update', id, body, calls.length);
+        if (failure) throw failure;
+        events.set(id, body);
+      },
+      async remove(id) {
+        calls.push(['remove', id]);
+        events.delete(id);
+      },
+    };
+  }
+
+  async function withLecture() {
+    const db = await freshDb();
+    const block = db.createBlock({
+      title: 'Lecture', date: '2026-11-09', start: '10:00', end: '12:00', repeat: { days: [1] }, location: 'Room 1', reminder: 15,
+    });
+    return { db, block };
+  }
+
+  const dates = (api) => [...api.events.values()].map((e) => e.start.dateTime.slice(0, 10)).sort();
+
+  it('makes event ids Google accepts, never the same as a task’s', () => {
+    const id = blockEventId('6f1e2d3c-aaaa:2026-11-09');
+    assert(/^[a-v0-9]{5,1024}$/.test(id), id);
+    equal(blockEventId('6f1e2d3c-aaaa:2026-11-09'), id);
+    assert(id !== eventIdFor('6f1e2d3c-aaaa:2026-11-09'));
+  });
+
+  it('keeps this week and the next eight in the calendar', () => {
+    equal(blockWindow(TODAY), { from: '2026-11-09', to: '2027-01-06' });
+  });
+
+  it('sends each class in the window as its own event, with its place and reminder', async () => {
+    const { db } = await withLecture();
+    const api = fakeApi();
+    const result = await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    equal(result.created, 9);
+    equal(dates(api), ['2026-11-09', '2026-11-16', '2026-11-23', '2026-11-30', '2026-12-07', '2026-12-14', '2026-12-21', '2026-12-28', '2027-01-04']);
+    const first = [...api.events.values()].find((e) => e.start.dateTime.startsWith('2026-11-09'));
+    equal(first.summary, 'Lecture');
+    equal(first.location, 'Room 1');
+    equal(first.start, { dateTime: '2026-11-09T10:00:00', timeZone: ZONE });
+    equal(first.end, { dateTime: '2026-11-09T12:00:00', timeZone: ZONE });
+    equal(first.reminders, { useDefault: false, overrides: [{ method: 'popup', minutes: 15 }] });
+    equal(first.extendedProperties.private.notesApp, '1');
+  });
+
+  it('a block without a reminder gets none in the calendar either', () => {
+    equal(blockEventBody({ title: 'x', date: TODAY, start: '09:00', end: '10:00', location: '', reminder: null }, ZONE).reminders, { useDefault: false, overrides: [] });
+  });
+
+  it('sends nothing when nothing changed', async () => {
+    const { db } = await withLecture();
+    const api = fakeApi();
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    api.calls.length = 0;
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    equal(api.calls, []);
+  });
+
+  it('follows a renamed series, a cancelled class and a moved one', async () => {
+    const { db, block } = await withLecture();
+    const api = fakeApi();
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    db.updateBlock(block.id, { title: 'Deep Learning' });
+    db.setOccurrence(block.id, '2026-11-16', { cancelled: true });
+    db.setOccurrence(block.id, '2026-11-23', { date: '2026-11-24', start: '14:00', end: '16:00' });
+    api.calls.length = 0;
+    const result = await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    equal(result.removed, 1, 'the cancelled one');
+    equal(result.updated, 8);
+    assert(!dates(api).includes('2026-11-16'));
+    const moved = api.events.get(blockEventId(`${block.id}:2026-11-23`));
+    equal(moved.start.dateTime, '2026-11-24T14:00:00');
+    assert([...api.events.values()].every((e) => e.summary === 'Deep Learning'));
+  });
+
+  it('moves the window on as days go by, and leaves past classes in the calendar', async () => {
+    const { db } = await withLecture();
+    const api = fakeApi();
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    const result = await runBlockSync(db, api, { today: '2026-11-25', timeZone: ZONE });
+    equal(result.created, 2);
+    equal(result.removed, 0);
+    assert(dates(api).includes('2026-11-09') && dates(api).includes('2027-01-18'));
+    equal(Object.keys(blockLinks(db)).length, 9, 'past ones are forgotten, not deleted');
+  });
+
+  it('removes a deleted block, and everything when sending is turned off', async () => {
+    const { db } = await withLecture();
+    const one = db.createBlock({ title: 'Dentist', date: '2026-11-12', start: '08:00', end: '09:00' });
+    const api = fakeApi();
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    equal(api.events.size, 10);
+    db.deleteBlock(one.id);
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    equal(api.events.size, 9);
+    api.events.set('mine', { summary: 'Not from the app' });
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE, send: false });
+    equal([...api.events.keys()], ['mine']);
+    equal(blockLinks(db), {});
+  });
+
+  it('uses the title it is given, for a block that is a task', async () => {
+    const { db } = await withLecture();
+    const api = fakeApi();
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE, titleFor: () => '✓ Read chapter 3' });
+    assert([...api.events.values()].every((e) => e.summary === '✓ Read chapter 3'));
+  });
+
+  it('stops when Google asks to slow down, keeping what was done, and carries on next time', async () => {
+    const { db } = await withLecture();
+    const slow = new CalendarError('Google Calendar answered 403', 403, 'rateLimit');
+    const api = fakeApi((kind, id, body, count) => (count > 3 ? slow : null));
+    let thrown = null;
+    try {
+      await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    } catch (error) {
+      thrown = error;
+    }
+    equal(thrown, slow);
+    equal(Object.keys(blockLinks(db)).length, 3);
+    const result = await runBlockSync(db, fakeApi(), { today: TODAY, timeZone: ZONE });
+    equal(result.created, 6);
+  });
+
+  it('removes every block event it added', async () => {
+    const { db } = await withLecture();
+    const api = fakeApi();
+    await runBlockSync(db, api, { today: TODAY, timeZone: ZONE });
+    api.events.set('mine', {});
+    equal(await removeAllBlockEvents(db, api), 0);
+    equal([...api.events.keys()], ['mine']);
+  });
+
+  it('leaves out a task that has a block, so it isn’t in the calendar twice', async () => {
+    const db = await freshDb();
+    addDailyTask(db, '15.00 write essay', TODAY);
+    addDailyTask(db, '16.00 call mum', TODAY);
+    const essay = syncableTasks(db).find((t) => t.text === 'Write essay');
+    equal(syncableTasks(db, new Set([essay.id])).map((t) => t.text), ['Call mum']);
+  });
+
+  // -- Reading events --------------------------------------------------------------------
+
+  const at = (day, hour, minute = 0) => new Date(2026, 10, day, hour, minute).toISOString();
+
+  it('reads timed events in local time', () => {
+    const pieces = readRangeEvents([
+      { id: 'a', summary: ' Gym ', htmlLink: 'https://calendar.google.com/x', start: { dateTime: at(10, 18) }, end: { dateTime: at(10, 19, 30) } },
+    ], '2026-11-09', '2026-11-15');
+    equal(pieces, [{
+      id: 'a', title: 'Gym', url: 'https://calendar.google.com/x', key: 'event:a:2026-11-10', date: '2026-11-10', start: '18:00', end: '19:30', allDay: false,
+    }]);
+  });
+
+  it('splits an event that runs past midnight, and one that ends at midnight stays on its day', () => {
+    const late = readRangeEvents([{ id: 'p', summary: 'Party', start: { dateTime: at(13, 22) }, end: { dateTime: at(14, 2) } }], '2026-11-09', '2026-11-15');
+    equal(late.map((p) => [p.date, p.start, p.end]), [['2026-11-13', '22:00', '23:59'], ['2026-11-14', '00:00', '02:00']]);
+    const midnight = readRangeEvents([{ id: 'm', start: { dateTime: at(12, 23) }, end: { dateTime: at(13, 0) } }], '2026-11-09', '2026-11-15');
+    equal(midnight.map((p) => [p.date, p.start, p.end, p.title]), [['2026-11-12', '23:00', '23:59', 'Busy']]);
+  });
+
+  it('gives an event with no length a quarter of an hour, so it can be seen', () => {
+    const pieces = readRangeEvents([{ id: 'z', start: { dateTime: at(10, 9) }, end: { dateTime: at(10, 9) } }], '2026-11-09', '2026-11-15');
+    equal(pieces.map((p) => [p.start, p.end]), [['09:00', '09:15']]);
+  });
+
+  it('reads all-day events, several days long, only within the range', () => {
+    const pieces = readRangeEvents([{ id: 'h', summary: 'Holiday', start: { date: '2026-11-07' }, end: { date: '2026-11-11' } }], '2026-11-09', '2026-11-15');
+    equal(pieces.map((p) => [p.date, p.allDay]), [['2026-11-09', true], ['2026-11-10', true]]);
+  });
+
+  it('skips its own events, cancelled and declined ones, and unsafe links', () => {
+    const base = { summary: 'x', start: { dateTime: at(10, 9) }, end: { dateTime: at(10, 10) } };
+    const pieces = readRangeEvents([
+      { ...base, id: 'own', extendedProperties: { private: { notesApp: '1' } } },
+      { ...base, id: 'gone', status: 'cancelled' },
+      { ...base, id: 'no', attendees: [{ self: true, responseStatus: 'declined' }] },
+      { ...base, id: 'where', eventType: 'workingLocation' },
+      { ...base, id: 'ok', htmlLink: 'javascript:alert(1)' },
+    ], '2026-11-09', '2026-11-15');
+    equal(pieces.map((p) => [p.id, p.url]), [['ok', '']]);
+  });
+
+  it('keeps weeks of events, newest twelve, and finds them by date', async () => {
+    const db = await freshDb();
+    const piece = (id, date) => ({ id, key: `event:${id}:${date}`, date, start: '09:00', end: '10:00', allDay: false, title: id, url: '' });
+    saveWeekEvents(db, '2026-11-09', [piece('a', '2026-11-10'), piece('b', '2026-11-12')], 1);
+    saveWeekEvents(db, '2026-11-16', [piece('c', '2026-11-17')], 2);
+    equal(weekEvents(db, '2026-11-09', '2026-11-15').map((p) => p.id), ['a', 'b']);
+    equal(weekEvents(db, '2026-11-12', '2026-11-17').map((p) => p.id), ['b', 'c']);
+    saveWeekEvents(db, '2026-11-09', [piece('a', '2026-11-10')], 3);
+    equal(weekEvents(db, '2026-11-09', '2026-11-15').map((p) => p.id), ['a'], 'a fresh read replaces the week');
+    for (let i = 0; i < 14; i += 1) saveWeekEvents(db, `2027-0${1 + Math.floor(i / 5)}-0${1 + (i % 5)}`, [], 10 + i);
+    equal(weekEvents(db, '2026-11-01', '2026-11-30'), [], 'the oldest weeks are forgotten');
+    saveWeekEvents(db, '2026-11-09', [piece('a', '2026-11-10')], 99);
+    equal(weekEventEntries(db, '2026-11-09', '2026-11-15', '2026-11-11').map((e) => [e.item.text, e.item.time, e.isEvent]), [['a', '09:00', true]]);
+    equal(weekEventEntries(db, '2026-11-09', '2026-11-15', '2026-11-10'), [], 'today’s come from the Today page’s copy');
+    clearWeekEvents(db);
+    equal(weekEvents(db, '2026-11-01', '2027-12-31'), []);
+  });
+
+  it('updates an event directly, and makes it again if it was deleted for good', async () => {
+    const seen = [];
+    const answer = (status, body = {}) => ({ ok: status < 400, status, json: async () => body });
+    let gone = false;
+    const api = createCalendarApi(() => 't', async (url, options) => {
+      seen.push(options.method);
+      if (options.method === 'PATCH') return gone ? answer(404, { error: { code: 404 } }) : answer(200, {});
+      return answer(200, {});
+    });
+    await api.update('b1234', { summary: 'x' });
+    equal(seen, ['PATCH'], 'one request, no failed create first');
+    gone = true;
+    await api.update('b1234', { summary: 'x' });
+    equal(seen, ['PATCH', 'PATCH', 'POST']);
+  });
+
+  it('reads a range of events across pages', async () => {
+    const asked = [];
+    const answer = (body) => ({ ok: true, status: 200, json: async () => body });
+    const api = createCalendarApi(() => 't', async (url) => {
+      const u = new URL(url);
+      asked.push(u);
+      return answer(u.searchParams.get('pageToken') ? { items: [{ id: 'b' }] } : { items: [{ id: 'a' }], nextPageToken: 'next' });
+    });
+    equal((await api.listRange('2026-11-09', '2026-11-15')).map((e) => e.id), ['a', 'b']);
+    equal(asked.length, 2);
+    equal(new Date(asked[0].searchParams.get('timeMin')).getDate(), 9);
+    equal(new Date(asked[0].searchParams.get('timeMax')).getDate(), 16);
+    assert(asked[0].searchParams.get('fields').includes('extendedProperties/private'));
+  });
+
+  it('starts with the timetable sent and events shown, once connected', async () => {
+    const db = await freshDb();
+    const config = calendarConfig(db);
+    equal([config.blocks, config.showEvents], [true, true]);
   });
 });
 

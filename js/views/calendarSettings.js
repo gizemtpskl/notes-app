@@ -2,13 +2,14 @@
  * calendarSettings.js: setting up Google Calendar in Settings, and the small status line on Today.
  */
 import { app } from '../context.js';
+import { WEEKS_AHEAD, blockLinks } from '../data/calendarTimetable.js';
 import { calendarConfig, clearEvents, isClientId, syncLinks, updateCalendarConfig } from '../data/googleCalendar.js';
 import { openDialog } from '../ui/dialog.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
 import {
-  calendarStatus, connectCalendar, disconnectCalendar, loadGoogleLibrary, onCalendarStatus, syncCalendar,
+  calendarStatus, connectCalendar, disconnectCalendar, loadGoogleLibrary, onCalendarStatus, setSendBlocks, setShowEvents, syncCalendar,
 } from './calendarConnection.js';
 
 const lastSyncText = (lastSync) => (lastSync
@@ -30,7 +31,7 @@ function setupSteps() {
 }
 
 function disconnectDialog() {
-  const count = Object.keys(syncLinks(app.db)).length;
+  const count = Object.keys(syncLinks(app.db)).length + Object.keys(blockLinks(app.db)).length;
   return openDialog({
     title: 'Turn off Google Calendar?',
     build: (close) => {
@@ -53,7 +54,7 @@ function disconnectDialog() {
         },
       }, 'Turn off');
       return h('div', null,
-        h('p', { class: 'dialog-text' }, 'Tasks stop going to your calendar, and today’s events leave the Today page. Your tasks stay as they are.'),
+        h('p', { class: 'dialog-text' }, 'Tasks and your timetable stop going to your calendar, and its events leave the Today page and the timetable. Your tasks and timetable stay as they are.'),
         count > 0 && h('label', { class: 'check-field' }, remove, `Also remove the ${plural(count, 'event')} this app added to your calendar`),
         error,
         h('div', { class: 'dialog-actions' },
@@ -78,8 +79,8 @@ export function calendarSection() {
         class: 'input', type: 'text', value: config.clientId, autocomplete: 'off', spellcheck: 'false', placeholder: '123456-abc.apps.googleusercontent.com',
       });
       fill(el,
-        h('p', { class: 'settings-text' }, 'Off. If you turn this on, tasks with a date and a time go to your main Google calendar, and today’s events appear on your Today page.'),
-        h('p', { class: 'settings-text' }, 'This is the one thing that sends anything off this device. Google gets the text, date and time of those tasks, and nothing else. Tasks in private notes are never sent. It needs a free Google project of your own.'),
+        h('p', { class: 'settings-text' }, 'Off. If you turn this on, tasks with a date and a time and your timetable go to your main Google calendar, and its events appear on your Today page and your timetable.'),
+        h('p', { class: 'settings-text' }, 'Google gets the text, date and time of those tasks, and the name, time, place and reminder of your timetable blocks, and nothing else. Tasks in private notes are never sent. It needs a free Google project of your own.'),
         setupSteps(),
         h('form', {
           class: 'calendar-form',
@@ -106,8 +107,18 @@ export function calendarSection() {
       return;
     }
 
+    const option = (checked, label, hint, onChange) => {
+      const box = h('input', { type: 'checkbox', checked, onChange: (event) => onChange(event.target.checked) });
+      return h('div', { class: 'calendar-option' }, h('label', { class: 'check-field' }, box, label), h('p', { class: 'field-hint' }, hint));
+    };
     fill(el,
-      h('p', { class: 'settings-text' }, 'On. Tasks with a date and a time go to your main Google calendar, and today’s events appear on your Today page. Tasks in private notes are never sent. Events you change in Google Calendar don’t change your tasks.'),
+      h('p', { class: 'settings-text' }, 'On. Tasks with a date and a time go to your main Google calendar, and today’s events appear on your Today page. Tasks in private notes are never sent. Changing something in Google Calendar doesn’t change your tasks or your timetable: change them here.'),
+      option(config.blocks, 'Send my timetable to Google Calendar',
+        `Each class or block becomes an event, from this week to ${WEEKS_AHEAD} weeks ahead, and more are added as the weeks go by. Changes and cancellations follow. Turning this off removes them from the calendar again.`,
+        (on) => setSendBlocks(on)),
+      option(config.showEvents, 'Show Google Calendar events on the timetable',
+        'Your own events appear on the timetable, outlined, so you can see everything in one place. Clicking one opens it in Google Calendar.',
+        (on) => setShowEvents(on)),
       h('p', { class: 'settings-text' }, state === 'signed-out' ? 'Sign in again to keep syncing.' : lastSyncText(config.lastSync)),
       problem,
       h('div', { class: 'settings-actions' },

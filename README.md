@@ -59,7 +59,9 @@ Today's tasks, Schedule, Next 7 days and Weekly progress are also available in *
 - **One week only:** opening a repeating block asks whether to change only that occurrence or all of them. One occurrence can also be cancelled and brought back.
 - **Overlaps:** the editor warns about them before you save, and the grid shows them side by side, marked in words.
 - **Dragging (mouse or pen):** draw a block on an empty part of a day, drag a block to move it, or drag its bottom edge to change its end. Times snap to 15 minutes, and Esc puts it back. On a touch screen a finger scrolls the grid, so blocks are changed in their editor there.
-- **Tasks:** **Tasks** opens a list of open tasks. Drag one onto a day, or use **Schedule**. The block keeps the task's checkbox, and **Unschedule** puts it back in the list. Ticking it on either side ticks it on both.
+- **Tasks with a time:** a task with a date and a time, such as `15:00 project meeting` typed on Today, shows on the timetable by itself, half an hour long and with rounder corners. It's the task itself, not a copy: ticking it or dragging it to another time changes the task everywhere. Its text opens its note.
+- **Tasks without a time:** **Tasks** opens a list of the open ones. Drag one onto a day, or use **Schedule**. The block keeps the task's checkbox, and **Unschedule** puts it back in the list. Ticking it on either side ticks it on both.
+- **Google Calendar:** when it's connected, your Google events show on the timetable, outlined, with all-day ones under the day's name. Clicking one opens it in Google Calendar. Your timetable goes the other way: see [Connect Google Calendar](#connect-google-calendar).
 - **Notes for a session:** a block's editor has **Write the lecture note** for classes and study sessions, which makes a course note with the date and lecture number, and **Write a note for this session** for anything else. The note links back to its session.
 - **Reminders:** choose one in a block's editor. They show while the app is open in a tab, as a notification if you allow it. A static site has no server, so it can't remind you while it's closed.
 - **More (⋯):** **Find free time**, **Print this week**, **Export as .ics**, and **Import an .ics file**, which shows what's in the file and lets you choose before anything is added. Calendar files use local times, and odd or even weeks are written out week by week, because calendar apps can't express them.
@@ -72,7 +74,7 @@ Today's tasks, Schedule, Next 7 days and Weekly progress are also available in *
 - **Backups:** Settings has a JSON backup of everything, including images and version history, which can be imported again. Markdown exports (a note, a collection, or everything as a zip) are for reading elsewhere.
 - **Passcode lock (optional):** encrypts everything stored on the device with AES-GCM, using a key protected by your passcode (PBKDF2 with SHA-256, 600,000 rounds). **A forgotten passcode cannot be recovered.** Backup files are not encrypted, so keep them somewhere safe. The lock protects what's stored on the device, for instance from someone reading the browser's files. It doesn't protect against anything running in the browser while the app is unlocked. It needs https or localhost.
 - **Google Drive sync (optional, off by default):** a copy of your notes in a hidden folder in your own Google Drive, encrypted with your passphrase if you choose one. See [Sync with Google Drive](#sync-with-google-drive).
-- **Google Calendar (optional, off by default):** when you set it up in **Settings → Google Calendar**, the text, date and time of tasks that have a time go to your main Google calendar, and today's events are copied to the Today page. Tasks in private notes are never sent. The access token stays in memory only, and the link's data is left out of backups.
+- **Google Calendar (optional, off by default):** when you set it up in **Settings → Google Calendar**, the text, date and time of tasks that have a time, and the name, time, place and reminder of your timetable blocks, go to your main Google calendar, and its events are copied to the Today page and the timetable. Tasks in private notes are never sent. The access token stays in memory only, and the link's data is left out of backups.
 - A strict Content Security Policy blocks injected scripts and every external request except to Google's sign-in, Drive and Calendar addresses, which the app only contacts once sync or Calendar is turned on. Opening a note can never contact another site.
 
 ## How notes are organized
@@ -164,6 +166,8 @@ js/
     dashboard.js          Which dashboard widgets show, in what order and size
     agenda.js             What a day and a week hold, for Your day and Your week
     googleCalendar.js     The optional Google Calendar link
+    calendarTimetable.js  Its timetable side: blocks to events, and a week of events to show
+    googleErrors.js       Reading Google's error answers
     sync.js, syncScope.js Merging copies for Google Drive sync, and what syncs
     flashcards.js, journal.js, tasks.js, taskText.js, daily.js, picker.js, tidy.js, weekly.js, stats.js, filing.js, dates.js, text.js, zip.js
   editor/               The rich text editor, math and code colors
@@ -187,6 +191,13 @@ Optional and free. Turn it on in **Settings → Sync with Google Drive** on each
 ## Connect Google Calendar
 
 This is optional and free. It needs a Google project of your own, because a site with no server has nowhere to keep a shared one. **Settings → Google Calendar** has the steps and shows the exact address to register. Register each address you use: both `http://localhost:8000` and `http://localhost` on your computer, and `https://YOUR-USERNAME.github.io`, with no folder, on GitHub Pages.
+
+What it does once connected:
+
+- **Tasks with a date and a time** become half-hour events. A finished task gets a ✓.
+- **Timetable blocks** become events, one for each class, from the start of this week to 8 weeks ahead, and more are added as the weeks go by. Renaming, moving and cancelling follow, and a block's reminder becomes the event's reminder. Past classes stay in the calendar. A task that has a block is sent once, as the block. **Send my timetable to Google Calendar** turns this off, which removes those events again.
+- **Your Google events** show on the Today page (today's) and on the timetable and the dashboard's week (the week you look at). **Show Google Calendar events on the timetable** turns this off.
+- Changes only go one way at a time: editing an event in Google Calendar doesn't change your tasks or timetable, and events this app made are never read back in, so nothing appears twice. Only your main calendar is used.
 
 While the Google project is in Testing, Google asks you to approve access again about once a week. A sign-in lasts about an hour and ends when the page reloads, so the Today page shows a **Sign in** button when one is needed.
 

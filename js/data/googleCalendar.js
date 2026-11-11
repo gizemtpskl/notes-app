@@ -3,9 +3,11 @@
  * it's set up in Settings, and nothing here contacts Google before then.
  *
  * Two things happen, and they stay separate so that neither can feed the other:
- *   - Tasks with a date and a time become events. This app decides what they say, so a task changed
- *     here updates its event. Changing the event in Google Calendar doesn't change the task.
- *   - Today's other events are copied in, to show on the Today page. They are only ever read.
+ *   - Tasks with a date and a time become events, and so do timetable blocks (calendarTimetable.js).
+ *     This app decides what they say, so a task changed here updates its event. Changing the event
+ *     in Google Calendar doesn't change the task.
+ *   - The calendar's other events are copied in, to show on the Today page and the timetable. They
+ *     are only ever read. Events this app made carry a private mark and are never copied in.
  *
  * An event's id is worked out from its task's id. Creating the same task twice therefore finds the
  * event from the first time instead of making a copy, even after a crash or a restored backup.
@@ -44,9 +46,14 @@ export class CalendarError extends Error {
 
 export const isClientId = (value) => CLIENT_ID.test(value);
 
-/** { clientId, on, lastSync } */
+/**
+ * { clientId, on, lastSync, blocks, showEvents }. blocks: timetable blocks go to the calendar.
+ * showEvents: the calendar's events show on the timetable. Both start on.
+ */
 export function calendarConfig(db) {
-  return { clientId: '', on: false, lastSync: 0, ...db.getMeta(CONFIG_KEY) };
+  return {
+    clientId: '', on: false, lastSync: 0, blocks: true, showEvents: true, ...db.getMeta(CONFIG_KEY),
+  };
 }
 
 export function updateCalendarConfig(db, patch) {
@@ -64,15 +71,18 @@ export function eventIdFor(taskId) {
   return `n${[...TEXT.encode(taskId)].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** Every task that can go to the calendar: it has a date and a time, and its note isn't private. */
-export function syncableTasks(db) {
+/**
+ * Every task that can go to the calendar: it has a date and a time, and its note isn't private.
+ * Tasks in `skip` are left out: those given a block on the timetable, when blocks go as events.
+ */
+export function syncableTasks(db, skip = new Set()) {
   const tasks = [];
   for (const note of db.listNotes()) {
     if (!note.private) {
       const type = db.getType(note.typeId);
       for (const field of tasksFields(type)) {
         for (const { item } of flatten(fieldValue(note, field))) {
-          if (item.due && item.time) tasks.push(item);
+          if (item.due && item.time && !skip.has(item.id)) tasks.push(item);
         }
       }
     }
@@ -120,9 +130,9 @@ export function eventBody(task, timeZone) {
 }
 
 /** Brings the calendar up to date. Returns { created, updated, removed, failed }. */
-export async function runSync(db, api, { today, timeZone }) {
+export async function runSync(db, api, { today, timeZone, skip }) {
   const links = { ...syncLinks(db) };
-  const plan = planSync(syncableTasks(db), links, today);
+  const plan = planSync(syncableTasks(db, skip), links, today);
   const result = {
     created: 0, updated: 0, removed: 0, failed: 0,
   };
@@ -132,7 +142,8 @@ export async function runSync(db, api, { today, timeZone }) {
       await work();
       result[count] += 1;
     } catch (error) {
-      if (error instanceof CalendarAuthError) throw error;
+      // A sign-in that ran out, or Google asking to slow down, ends the run. It's tried again later.
+      if (error instanceof CalendarAuthError || error?.reason === 'rateLimit' || error?.status === 429) throw error;
       console.warn('Calendar sync:', error);
       result.failed += 1;
     }
@@ -146,7 +157,7 @@ export async function runSync(db, api, { today, timeZone }) {
     }
     for (const task of plan.update) {
       await attempt(async () => {
-        await api.put(eventIdFor(task.id), eventBody(task, timeZone));
+        await api.update(eventIdFor(task.id), eventBody(task, timeZone));
         links[task.id] = fingerprint(task);
       }, 'updated');
     }
@@ -281,6 +292,16 @@ export function createCalendarApi(getToken, fetchFn = (...args) => fetch(...args
       }
     },
 
+    /** Changes an event made before. If it's gone from the calendar altogether, it's made again. */
+    async update(id, body) {
+      try {
+        await patch(id, body);
+      } catch (error) {
+        if (error.status === 404 || error.status === 410) await send(EVENTS_URL, { method: 'POST', body: JSON.stringify({ ...body, id }) });
+        else throw error;
+      }
+    },
+
     /** Removes an event. One that's already gone counts as done. */
     async remove(id) {
       try {
@@ -302,6 +323,27 @@ export function createCalendarApi(getToken, fetchFn = (...args) => fetch(...args
       });
       const data = await send(`${EVENTS_URL}?${params}`);
       return (data.items ?? []).map((raw) => readEvent(raw, today)).filter(Boolean);
+    },
+
+    /** Every event from the start of `from` to the end of `to`, as Google sends them. */
+    async listRange(from, to) {
+      const items = [];
+      let pageToken = '';
+      do {
+        const params = new URLSearchParams({
+          timeMin: parseDate(from).toISOString(),
+          timeMax: parseDate(addDays(to, 1)).toISOString(),
+          singleEvents: 'true',
+          orderBy: 'startTime',
+          maxResults: '250',
+          fields: 'nextPageToken,items(id,status,summary,htmlLink,start,end,eventType,extendedProperties/private,attendees(self,responseStatus))',
+        });
+        if (pageToken) params.set('pageToken', pageToken);
+        const data = await send(`${EVENTS_URL}?${params}`);
+        items.push(...(data.items ?? []));
+        pageToken = data.nextPageToken ?? '';
+      } while (pageToken);
+      return items;
     },
   };
 }

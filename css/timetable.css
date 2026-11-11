@@ -158,6 +158,26 @@
 .tt-task-check { position: absolute; top: 4px; right: 4px; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
 .tt-block.is-done { background: var(--bg-raised); }
 .tt-block.is-done .tt-block-title { color: var(--text-muted); text-decoration: line-through; }
+/* A task's own time: rounder, so it reads as a task rather than a block of the timetable. */
+.tt-block.is-timed-task { border-radius: 10px; }
+.tt-block.is-timed-task .tt-task-check { top: 50%; margin-top: -7.5px; }
+.tt-block.is-timed-task:not(.is-short) .tt-task-check { top: 4px; margin-top: 0; }
+
+/* Google Calendar's events: outlined, not filled, since they live in Google Calendar. */
+.tt-block.is-event { border: 1px dashed var(--border-strong); border-left: 3px solid var(--text-faint); background: var(--bg-raised); color: var(--text); text-decoration: none; }
+.tt-block.is-event:hover { background: var(--bg-hover); }
+.tt-allday { display: flex; flex-basis: 100%; flex-direction: column; gap: 2px; min-width: 0; margin: 4px 0 0; padding: 0; list-style: none; text-align: left; }
+.tt-allday-item { display: block; overflow: hidden; padding: 1px 6px; border: 1px dashed var(--border-strong); border-radius: 4px; background: var(--bg-raised); color: var(--text); font-size: 11px; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+a.tt-allday-item:hover { background: var(--bg-hover); }
+a.tt-allday-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tt-agenda-row.is-event { border-style: dashed; border-left: 3px solid var(--text-faint); }
+a.tt-agenda-row { text-decoration: none; }
+.tt-agenda-item { display: flex; align-items: center; gap: 8px; }
+.tt-agenda-item .tt-agenda-row { flex: 1; min-width: 0; }
+.tt-agenda-check { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.tt-agenda-row.is-done .tt-agenda-title { color: var(--text-muted); text-decoration: line-through; }
+.timetable .today-calendar { margin: -4px 0 10px; }
+
 .tt-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 14px; align-items: start; }
 .tt-layout-main { min-width: 0; }
 .tt-tasks { max-height: min(72vh, 900px); overflow: auto; padding: 12px 12px 6px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-raised); }
