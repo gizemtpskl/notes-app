@@ -36,7 +36,9 @@ Push your changes. Open copies of the app check for a new version in the backgro
 
 ## Dashboard
 
-The app opens on the dashboard (or on the Inbox or your last note: **Settings → Open the app on**). It greets you, has quick capture, and shows widgets in two columns on a wide screen and one on a phone, in the same order:
+The app opens on the dashboard (or on the Inbox or your last note: **Settings → Open the app on**). It greets you, has a box for adding things, and shows widgets in two columns on a wide screen and one on a phone, in the same order:
+
+- **Adding from the dashboard:** under the box, choose where a line goes. **Inbox** captures a note. **To-do** adds to today's to-dos, read like on Today (`10:00-11:00 study` fills that slot, `call mum tomorrow` goes on tomorrow's list). **Timetable** opens the block editor filled in from a line like `Dentist Thu 10:00-11:00`, to check before saving. The **+** on Your day and Your week jumps to the box with To-do or Timetable chosen. The choice is remembered on each device.
 
 - **Your day:** everything for today in one list, in time order: timetable blocks, tasks with and without a time, deadlines and Google Calendar events, with what's on now and next marked. Tasks can be ticked here.
 - **Your week:** Monday to Sunday at a glance, each day with what it holds, and totals for the week: hours on the timetable, tasks done, deadlines, habits and journal days. On a phone it's a strip of days with counts.

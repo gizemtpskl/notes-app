@@ -276,3 +276,13 @@ a.day-title:hover { text-decoration: underline; }
   .day-row { min-height: 34px; padding-block: 2px; }
   .day-where, .day-summary { display: none; }
 }
+
+/* -- Adding from the dashboard -------------------------------------------------------------- */
+
+.capture-field-modes { flex-direction: column; align-items: stretch; gap: 8px; }
+.capture-field-row { display: flex; align-items: flex-end; gap: 10px; }
+.capture-field-row .capture-input { flex: 1; min-width: 0; align-self: center; font-size: 15px; }
+.capture-modes { align-self: flex-start; }
+.dash-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -6px 2px 0; }
+.dash-card-head .section-title { margin-bottom: 0; }
+.dash-add { flex: none; width: 30px; height: 30px; }

@@ -17,7 +17,7 @@ import { openDialog } from '../ui/dialog.js';
 import { fill, h, longDate } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { pointerDrag } from '../ui/pointerDrag.js';
-import { captureField } from './capture.js';
+import { dashboardCaptureField } from './capture.js';
 import { WIDGET_VIEWS } from './dashboardWidgets.js';
 import { openHabitsDialog } from './habitsDialog.js';
 import { emptyState } from './noteList.js';
@@ -238,7 +238,7 @@ export function homeView() {
       h('header', { class: 'page-head' },
         h('p', { class: 'page-eyebrow' }, longDate(Date.now())),
         h('div', { class: 'page-title-row' }, title, h('div', { class: 'page-actions' }, editButton))),
-      captureField(),
+      dashboardCaptureField(),
       editBar,
       grid),
     update: (change) => {

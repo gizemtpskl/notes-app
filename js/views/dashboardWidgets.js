@@ -27,6 +27,7 @@ import { scheduleAt, startOfWeek, startsIn } from '../data/timetable.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { newNote, withUndo } from './actions.js';
+import { focusDashCapture } from './capture.js';
 import { collectCards } from './courseViews.js';
 import { fieldDisplay } from './fieldWidgets.js';
 import { openHabitsDialog } from './habitsDialog.js';
@@ -60,9 +61,28 @@ export const card = (title, href, ...content) => h('section', { class: 'dash-car
   h('h2', { class: 'section-title' }, href ? h('a', { class: 'dash-title-link', href }, title) : title),
   content);
 
-/** A widget with nothing to do today: one short line. */
-const allClear = (title, href, text) => h('section', { class: 'dash-card dash-clear' },
-  h('h2', { class: 'section-title' }, href ? h('a', { class: 'dash-title-link', href }, title) : title),
+/** A + in a card's corner that moves to the box at the top, set to add here. */
+const addButton = (mode, label) => h('button', {
+  class: 'icon-btn dash-add',
+  type: 'button',
+  'aria-label': label,
+  title: label,
+  dataset: { act: `add-${mode}` },
+  onClick: () => focusDashCapture(mode),
+}, icon('plus', 16));
+
+/** A card with a title, a + to add to it, and its content. */
+const addCard = (title, href, add, ...content) => h('section', { class: 'dash-card' },
+  h('div', { class: 'dash-card-head' },
+    h('h2', { class: 'section-title' }, h('a', { class: 'dash-title-link', href }, title)),
+    add),
+  content);
+
+/** A widget with nothing to do today: one short line, and a + when it can be added to. */
+const allClear = (title, href, text, add = null) => h('section', { class: 'dash-card dash-clear' },
+  add
+    ? h('div', { class: 'dash-card-head' }, h('h2', { class: 'section-title' }, h('a', { class: 'dash-title-link', href }, title)), add)
+    : h('h2', { class: 'section-title' }, href ? h('a', { class: 'dash-title-link', href }, title) : title),
   h('p', { class: 'dash-clear-text' }, icon('check', 14), text));
 
 const nowTime = () => {
@@ -137,7 +157,7 @@ export const WIDGET_VIEWS = {
     const occurrences = loadOccurrences(db, today, today);
     const entries = agendaEntries(db, today);
     if (!dayAgenda({ occurrences, entries }, today, nowTime()).all.length) {
-      return allClear('Your day', '#/today', 'Nothing planned for today.');
+      return allClear('Your day', '#/today', 'Nothing planned for today.', addButton('todo', 'Add a to-do for today'));
     }
     const box = h('div');
     const draw = () => {
@@ -157,7 +177,7 @@ export const WIDGET_VIEWS = {
     };
     draw();
     timers.push(setInterval(draw, 60000));
-    return card(`Your day · ${formatDay(today, { weekday: 'long' })}`, '#/today', box);
+    return addCard(`Your day · ${formatDay(today, { weekday: 'long' })}`, '#/today', addButton('todo', 'Add a to-do for today'), box);
   },
 
   week({ db, today }) {
@@ -172,12 +192,12 @@ export const WIDGET_VIEWS = {
     const habitTicks = habits.reduce((sum, habit) => sum + elapsed.filter((d) => habit.done[d.date]).length, 0);
     const journalDays = new Set(db.listNotes().filter((n) => n.typeId === 'journal').map(entryDate).filter((d) => d >= from && d <= to)).size;
     if (!days.some((d) => d.items.length) && !habits.length && !journalDays) {
-      return allClear('Your week', '#/timetable', 'Nothing planned this week yet.');
+      return allClear('Your week', '#/timetable', 'Nothing planned this week yet.', addButton('timetable', 'Add to the timetable'));
     }
     const hours = (minutes) => `${(minutes / 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} h`;
     const mark = (item) => (item.kind === 'deadline' ? '⚑ ' : item.kind === 'block' || item.kind === 'event' ? '' : item.done ? '✓ ' : '○ ');
     const stat = (value, label) => h('div', { class: 'week-stat' }, h('span', { class: 'week-stat-value' }, value), h('span', { class: 'week-stat-label' }, label));
-    return card(`Your week · ${formatDay(from, { month: 'short', day: 'numeric' })} – ${formatDay(to, { month: 'short', day: 'numeric' })}`, '#/timetable',
+    return addCard(`Your week · ${formatDay(from, { month: 'short', day: 'numeric' })} – ${formatDay(to, { month: 'short', day: 'numeric' })}`, '#/timetable', addButton('timetable', 'Add to the timetable'),
       h('ol', { class: 'week-days' }, days.map((day) => {
         const shown = day.items.slice(0, 4);
         const left = day.items.length - shown.length;
