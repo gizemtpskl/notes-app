@@ -12,6 +12,14 @@ import { uid } from './schema.js';
 
 export const FOCUS_LENGTHS = Object.freeze([25, 50, 90]);
 export const MAX_FOCUS_MINUTES = 240;
+/** A weekly focus goal is between half an hour and 80 hours, kept in minutes in settings.focusGoal. */
+export const MAX_FOCUS_GOAL_HOURS = 80;
+
+/** The goal in minutes, or 0 for none or anything unusable. */
+export function cleanFocusGoal(value) {
+  const minutes = Math.round(Number(value));
+  return Number.isFinite(minutes) && minutes >= 30 && minutes <= MAX_FOCUS_GOAL_HOURS * 60 ? minutes : 0;
+}
 
 const idOrNull = (value) => (typeof value === 'string' && value && value.length <= 128 ? value : null);
 

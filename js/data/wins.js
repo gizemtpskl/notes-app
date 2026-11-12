@@ -11,7 +11,7 @@
  */
 import { addDays, firstDayOfWeek, toDateStr } from './dates.js';
 import { fieldValue } from './fieldKinds.js';
-import { focusMinutes } from './focus.js';
+import { cleanFocusGoal, focusMinutes, formatMinutes } from './focus.js';
 import { habitStreak } from './habits.js';
 import { entryDate, streaks } from './journal.js';
 import { flatten } from './tasks.js';
@@ -81,6 +81,13 @@ export function goalProgress(db, collection, { today, weekStart = 1 }) {
   return {
     goal: cleanGoal(collection.weeklyGoal), done: stampedBetween(notes, type, goal, from, to).length, verb: goal.verb, from, to,
   };
+}
+
+/** This week's focus against the weekly focus goal: { goal, done, from, to }, in minutes. goal is 0 with none. */
+export function focusGoalProgress(db, { today, weekStart = 1 }) {
+  const from = weekStartOf(today, weekStart);
+  const to = addDays(from, 6);
+  return { goal: cleanFocusGoal(db.getSettings().focusGoal), done: focusMinutes(db.listFocusSessions(), from, to), from, to };
 }
 
 /** Days in a range, both included, up to today. */
@@ -207,6 +214,12 @@ export function milestones(db, { today, weekStart = 1 }) {
         add(`sent:${type.id}:${count}`, 'sent', count === 1 ? `First ${typeNoun(type.name)} ${goal.verb}` : `${count} ${typeNoun(type.name, count)} ${goal.verb}`, count === 1 ? 'The first one is the hardest. Well done.' : 'Every one is a chance. Keep going.', 50 + count / 10);
       }
     }
+  }
+
+  // The weekly focus goal.
+  const focusGoal = focusGoalProgress(db, { today, weekStart });
+  if (focusGoal.goal && focusGoal.done >= focusGoal.goal) {
+    add(`focusgoal:${focusGoal.from}`, 'focus', `Weekly focus goal reached: ${formatMinutes(focusGoal.done)}`, 'Deep work, week after week.', 58);
   }
 
   // Focus hours adding up.

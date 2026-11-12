@@ -243,7 +243,7 @@ export function homeView() {
       grid),
     update: (change) => {
       if (change.stores.has('notes') || change.stores.has('spaces') || change.stores.has('collections') || change.stores.has('savedViews')
-        || change.stores.has('timeBlocks') || change.stores.has('semesters') || change.stores.has('habits')
+        || change.stores.has('timeBlocks') || change.stores.has('semesters') || change.stores.has('habits') || change.stores.has('focus')
         || change.ids.has('settings') || change.ids.has('gcalEvents') || change.ids.has('gcalWeeks') || change.ids.has('lastExportAt')) refresh();
     },
     destroy: () => timers.splice(0).forEach(clearInterval),

@@ -286,3 +286,26 @@ a.day-title:hover { text-decoration: underline; }
 .dash-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -6px 2px 0; }
 .dash-card-head .section-title { margin-bottom: 0; }
 .dash-add { flex: none; width: 30px; height: 30px; }
+
+/* -- Progress bars on Your day and Your week ------------------------------------------------- */
+
+.meter { min-width: 0; }
+.meter-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-bottom: 5px; font-size: 13px; }
+.meter-label { color: var(--text-muted); }
+.meter-value { display: inline-flex; align-items: center; gap: 3px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.meter.is-met .meter-value svg { color: var(--success-ink); }
+.meter-action { margin-left: auto; font-size: 12px; }
+.meter-track { height: 8px; overflow: hidden; border-radius: 4px; background: var(--bg-active); }
+.meter-fill { width: var(--progress, 0%); height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s ease; }
+.meter-empty .meter-head { margin-bottom: 0; }
+.day-meter { margin: 2px 0 10px; }
+.week-meters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 22px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+@media (max-width: 1000px) {
+  .week-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 380px) {
+  .week-meters { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter-fill { transition: none; }
+}

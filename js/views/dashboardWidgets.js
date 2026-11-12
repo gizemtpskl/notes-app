@@ -22,12 +22,13 @@ import { findDuplicateGroups, findEmptyNotes, findStaleNotes } from '../data/tid
 import { displayTitle, summaryFields, tasksFields } from '../data/types.js';
 import { completedTasks, weekStartOf } from '../data/weekly.js';
 import { formatMinutes } from '../data/focus.js';
-import { typeNoun, weekStartFrom, weekWins } from '../data/wins.js';
+import { focusGoalProgress, typeNoun, weekStartFrom, weekWins } from '../data/wins.js';
 import { scheduleAt, startOfWeek, startsIn } from '../data/timetable.js';
 import { fill, h, plural } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { newNote, withUndo } from './actions.js';
 import { focusDashCapture } from './capture.js';
+import { focusGoalDialog } from './focus.js';
 import { collectCards } from './courseViews.js';
 import { fieldDisplay } from './fieldWidgets.js';
 import { openHabitsDialog } from './habitsDialog.js';
@@ -70,6 +71,29 @@ const addButton = (mode, label) => h('button', {
   dataset: { act: `add-${mode}` },
   onClick: () => focusDashCapture(mode),
 }, icon('plus', 16));
+
+/**
+ * A labelled bar: what it counts, how far along in words, and the bar itself, which says the
+ * same to a screen reader. Coral fills it; the words carry the numbers, so color isn't needed.
+ */
+const meter = ({ label, done, total, text, action = null, cls = '' }) => {
+  const ratio = total > 0 ? Math.min(1, done / total) : 0;
+  const met = total > 0 && done >= total;
+  return h('div', { class: `meter${met ? ' is-met' : ''}${cls ? ` ${cls}` : ''}` },
+    h('div', { class: 'meter-head' },
+      h('span', { class: 'meter-label' }, label),
+      h('span', { class: 'meter-value' }, met && icon('check', 13), text),
+      action),
+    h('div', {
+      class: 'meter-track',
+      role: 'progressbar',
+      'aria-label': label,
+      'aria-valuemin': '0',
+      'aria-valuemax': String(total),
+      'aria-valuenow': String(Math.min(done, total)),
+      'aria-valuetext': text,
+    }, h('div', { class: 'meter-fill', cssVars: { '--progress': `${ratio * 100}%` } })));
+};
 
 /** A card with a title, a + to add to it, and its content. */
 const addCard = (title, href, add, ...content) => h('section', { class: 'dash-card' },
@@ -170,8 +194,18 @@ export const WIDGET_VIEWS = {
       const hidden = all.length - rows.length;
       const open = all.filter((i) => (i.kind === 'task' || i.kind === 'event') && !i.done).length;
       const blocks = all.filter((i) => i.kind === 'block').length;
+      // Today's to-dos: what's due today, done or not, and what's overdue and still open.
+      const todos = all.filter((i) => i.kind === 'task');
+      const todosDone = todos.filter((i) => i.done).length;
+      const openEvents = all.filter((i) => i.kind === 'event' && !i.done).length;
       fill(box,
-        h('p', { class: 'dash-stat day-summary' }, [blocks && plural(blocks, 'block'), open && `${plural(open, 'thing')} to do`].filter(Boolean).join(' · ') || 'All done for today'),
+        // With the bar counting to-dos, the line above it only counts what the bar doesn't.
+        todos.length > 0
+          ? (blocks || openEvents) > 0 && h('p', { class: 'dash-stat day-summary' }, [blocks && plural(blocks, 'block'), openEvents && plural(openEvents, 'event')].filter(Boolean).join(' · '))
+          : h('p', { class: 'dash-stat day-summary' }, [blocks && plural(blocks, 'block'), open && `${plural(open, 'thing')} to do`].filter(Boolean).join(' · ') || 'All done for today'),
+        todos.length > 0 && meter({
+          label: 'Today’s to-dos', done: todosDone, total: todos.length, text: `${todosDone} of ${todos.length} done`, cls: 'day-meter',
+        }),
         h('ul', { class: 'day-list' }, rows.map((item) => dayRow(db, item, today, refresh))),
         hidden > 0 && h('a', { class: 'btn-link', href: '#/today' }, all.length > limit && past.length ? `${hidden} more, ${past.length} already over` : `${hidden} more`));
     };
@@ -191,10 +225,15 @@ export const WIDGET_VIEWS = {
     const elapsed = days.filter((d) => d.date <= today);
     const habitTicks = habits.reduce((sum, habit) => sum + elapsed.filter((d) => habit.done[d.date]).length, 0);
     const journalDays = new Set(db.listNotes().filter((n) => n.typeId === 'journal').map(entryDate).filter((d) => d >= from && d <= to)).size;
-    if (!days.some((d) => d.items.length) && !habits.length && !journalDays) {
+    const focus = focusGoalProgress(db, { today, weekStart: weekStartFrom(db.getSettings().weekStart) });
+    if (!days.some((d) => d.items.length) && !habits.length && !journalDays && !focus.goal && !focus.done) {
       return allClear('Your week', '#/timetable', 'Nothing planned this week yet.', addButton('timetable', 'Add to the timetable'));
     }
     const hours = (minutes) => `${(minutes / 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} h`;
+    const goalButton = (text) => h('button', {
+      class: 'btn-link meter-action', type: 'button', dataset: { act: 'focus-goal' }, onClick: focusGoalDialog,
+    }, text);
+    const habitPossible = habits.length * elapsed.length;
     const mark = (item) => (item.kind === 'deadline' ? '⚑ ' : item.kind === 'block' || item.kind === 'event' ? '' : item.done ? '✓ ' : '○ ');
     const stat = (value, label) => h('div', { class: 'week-stat' }, h('span', { class: 'week-stat-value' }, value), h('span', { class: 'week-stat-label' }, label));
     return addCard(`Your week · ${formatDay(from, { month: 'short', day: 'numeric' })} – ${formatDay(to, { month: 'short', day: 'numeric' })}`, '#/timetable', addButton('timetable', 'Add to the timetable'),
@@ -219,10 +258,22 @@ export const WIDGET_VIEWS = {
       })),
       h('div', { class: 'week-stats' },
         stat(hours(totals.minutes), 'on your timetable'),
-        totals.tasks > 0 && stat(`${totals.tasksDone} of ${totals.tasks}`, 'tasks done'),
-        totals.deadlines > 0 && stat(String(totals.deadlines), plural(totals.deadlines, 'deadline').replace(/^\d+ /, '')),
-        habits.length > 0 && stat(`${Math.round((habitTicks / (habits.length * elapsed.length)) * 100)}%`, 'of habits ticked'),
-        stat(`${journalDays} of ${elapsed.length}`, journalDays === 1 ? 'day in your journal' : 'days in your journal')));
+        totals.deadlines > 0 && stat(String(totals.deadlines), plural(totals.deadlines, 'deadline').replace(/^\d+ /, ''))),
+      h('div', { class: 'week-meters' },
+        totals.tasks > 0 && meter({ label: 'Tasks done', done: totals.tasksDone, total: totals.tasks, text: `${totals.tasksDone} of ${totals.tasks}` }),
+        habitPossible > 0 && meter({
+          label: 'Habits ticked', done: habitTicks, total: habitPossible, text: `${Math.round((habitTicks / habitPossible) * 100)}%`,
+        }),
+        meter({ label: 'Journal days', done: journalDays, total: elapsed.length, text: `${journalDays} of ${elapsed.length}` }),
+        focus.goal
+          ? meter({
+            label: 'Focus', done: focus.done, total: focus.goal, text: `${formatMinutes(focus.done)} of ${formatMinutes(focus.goal)}`, action: goalButton('Change'),
+          })
+          : h('div', { class: 'meter meter-empty' },
+            h('div', { class: 'meter-head' },
+              h('span', { class: 'meter-label' }, 'Focus'),
+              h('span', { class: 'meter-value' }, focus.done ? formatMinutes(focus.done) : 'None yet'),
+              goalButton('Set a weekly goal')))));
   },
 
 

@@ -45,7 +45,7 @@
 }
 
 @media (forced-colors: active) {
-  .chart-column, .hbar-fill, .progress-fill, .chart-line { forced-color-adjust: none; fill: CanvasText; background: CanvasText; stroke: CanvasText; }
+  .chart-column, .hbar-fill, .progress-fill, .meter-fill, .chart-line { forced-color-adjust: none; fill: CanvasText; background: CanvasText; stroke: CanvasText; }
   .chart-line { fill: none; }
   .mcal-note { border-left-color: CanvasText; }
 }

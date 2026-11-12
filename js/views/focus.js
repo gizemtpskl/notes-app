@@ -8,7 +8,7 @@
  */
 import { app } from '../context.js';
 import { toDateStr } from '../data/dates.js';
-import { FOCUS_LENGTHS, MAX_FOCUS_MINUTES, focusMinutes, formatMinutes } from '../data/focus.js';
+import { FOCUS_LENGTHS, MAX_FOCUS_GOAL_HOURS, MAX_FOCUS_MINUTES, cleanFocusGoal, focusMinutes, formatMinutes } from '../data/focus.js';
 import { uid } from '../data/schema.js';
 import { openDialog } from '../ui/dialog.js';
 import { h, plural } from '../ui/dom.js';
@@ -309,6 +309,45 @@ export function startFocusDialog(target = {}) {
 }
 
 /** Shows a timer left running before a reload, and follows timers started in other tabs. */
+/** Sets, changes or removes the weekly focus goal, in hours. */
+export async function focusGoalDialog() {
+  const { db } = app;
+  const current = cleanFocusGoal(db.getSettings().focusGoal);
+  const hours = await openDialog({
+    title: 'Weekly focus goal',
+    build: (close) => {
+      const input = h('input', {
+        class: 'input goal-input',
+        type: 'number',
+        id: 'focus-goal-input',
+        min: 0.5,
+        max: MAX_FOCUS_GOAL_HOURS,
+        step: 0.5,
+        required: true,
+        value: String(current ? current / 60 : 10),
+      });
+      return h('form', {
+        onSubmit: (event) => {
+          event.preventDefault();
+          close(Number(input.value));
+        },
+      },
+      h('label', { class: 'field', for: 'focus-goal-input' },
+        h('span', { class: 'field-label' }, 'Hours of focus each week'),
+        input),
+      h('p', { class: 'field-hint' }, 'Time from the focus timer counts. The bar in Your week fills up as you go, and starts again each week.'),
+      h('div', { class: 'dialog-actions' },
+        current > 0 && h('button', { class: 'btn btn-danger-quiet', type: 'button', onClick: () => close(0) }, 'Remove goal'),
+        h('button', { class: 'btn', type: 'button', onClick: () => close(undefined) }, 'Cancel'),
+        h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save')));
+    },
+  });
+  if (hours === undefined || hours === null || Number.isNaN(hours)) return;
+  const goal = hours === 0 ? 0 : cleanFocusGoal(hours * 60);
+  db.updateSettings({ focusGoal: goal });
+  toast(goal ? `Weekly focus goal: ${formatMinutes(goal)}` : 'Focus goal removed');
+}
+
 export function startFocusTimer() {
   render();
   window.addEventListener('storage', (event) => {

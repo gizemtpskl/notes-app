@@ -10,7 +10,7 @@ import { displayTitle } from '../data/types.js';
 import { downloadBlob, fill, h } from '../ui/dom.js';
 import { openDialog } from '../ui/dialog.js';
 import { icon } from '../ui/icons.js';
-import { focusTargetForNote, startFocusDialog } from './focus.js';
+import { focusGoalDialog, focusTargetForNote, startFocusDialog } from './focus.js';
 import { archiveNotes, locationName, moveNotes, newNote, showError, trashNotes } from './actions.js';
 import { pickDestination, pickNote } from './dialogs.js';
 import { newFromTemplate } from './templatesPage.js';
@@ -99,6 +99,7 @@ function allCommands() {
   for (const tag of db.listTags()) add(`Go to #${tag.name}`, 'tag', () => app.navigate(`tag/${tag.id}`));
 
   add('Start a focus session', 'clock', () => startFocusDialog(), 'timer pomodoro');
+  add('Set a weekly focus goal', 'target', () => focusGoalDialog(), 'focus hours progress');
   if (db.storage.encrypted) add('Lock now', 'lock', () => app.lockNow());
   add('Download backup', 'download', () => exportBackup(), 'export json');
   add('Keyboard shortcuts', 'keyboard', () => app.showShortcuts(), 'help');

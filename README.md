@@ -40,8 +40,8 @@ The app opens on the dashboard (or on the Inbox or your last note: **Settings â†
 
 - **Adding from the dashboard:** under the box, choose where a line goes. **Inbox** captures a note. **To-do** adds to today's to-dos, read like on Today (`10:00-11:00 study` fills that slot, `call mum tomorrow` goes on tomorrow's list). **Timetable** opens the block editor filled in from a line like `Dentist Thu 10:00-11:00`, to check before saving. The **+** on Your day and Your week jumps to the box with To-do or Timetable chosen. The choice is remembered on each device.
 
-- **Your day:** everything for today in one list, in time order: timetable blocks, tasks with and without a time, deadlines and Google Calendar events, with what's on now and next marked. Tasks can be ticked here.
-- **Your week:** Monday to Sunday at a glance, each day with what it holds, and totals for the week: hours on the timetable, tasks done, deadlines, habits and journal days. On a phone it's a strip of days with counts.
+- **Your day:** everything for today in one list, in time order: timetable blocks, tasks with and without a time, deadlines and Google Calendar events, with what's on now and next marked. Tasks can be ticked here, and a bar shows how many of today's to-dos are done.
+- **Your week:** Monday to Sunday at a glance, each day with what it holds, hours on the timetable and deadlines, and bars for the week so far: tasks done, habits ticked, journal days and focus. **Set a weekly goal** under Focus (or "Set a weekly focus goal" in `Ctrl/Cmd+K`) picks a number of hours; the bar fills as you use the focus timer and starts again each week, and reaching it is celebrated. On a phone the days become a strip with counts.
 - Then journal check-in and Inbox.
 - **Wins this week:** what you got done so far this week: tasks done, focus time, applications sent, journal days, habit check-ins and notes written. Only what happened shows.
 - Then course review, habits, continue, pinned notes, "Bored? Try this", tonight's watch, on this day, and tidy-up and backup reminders.

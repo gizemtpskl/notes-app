@@ -34,10 +34,10 @@ import {
 import { googleErrorReason } from '../data/googleErrors.js';
 import { NotesDb } from '../data/db.js';
 import {
-  cleanFocusSession, createFocusSession, focusByPlace, focusMinutes, formatMinutes,
+  cleanFocusGoal, cleanFocusSession, createFocusSession, focusByPlace, focusMinutes, formatMinutes,
 } from '../data/focus.js';
 import {
-  cleanGoal, goalOf, goalProgress, milestones, typeNoun, weekWins,
+  cleanGoal, focusGoalProgress, goalOf, goalProgress, milestones, typeNoun, weekWins,
 } from '../data/wins.js';
 import { SYNC_STORES } from '../data/syncScope.js';
 import { h } from '../ui/dom.js';
@@ -4774,6 +4774,22 @@ describe('Wins, goals and milestones', () => {
     equal(goalOf(db.getType('free')), null);
     equal([typeNoun('Job application'), typeNoun('Job application', 3), typeNoun('PhD application', 2)], ['job application', 'job applications', 'PhD applications']);
     equal([cleanGoal(3), cleanGoal(100), cleanGoal(-2), cleanGoal('x')], [3, 50, 0, 0]);
+  });
+
+  it('a weekly focus goal fills with this week’s focus, and is celebrated once reached', async () => {
+    const db = await freshDb();
+    equal([cleanFocusGoal(600), cleanFocusGoal(10), cleanFocusGoal(80 * 60 + 1), cleanFocusGoal('x'), cleanFocusGoal(null)], [600, 0, 0, 0, 0]);
+    equal(focusGoalProgress(db, { today }).goal, 0, 'no goal at first');
+    db.updateSettings({ focusGoal: 120 });
+    db.addFocusSession({ start: Date.now(), minutes: 50, date: today });
+    db.addFocusSession({ start: Date.now(), minutes: 50, date: addDays(today, -14) });
+    const half = focusGoalProgress(db, { today });
+    equal([half.goal, half.done], [120, 50], 'only this week counts');
+    equal(milestones(db, { today }).some((m) => m.key.startsWith('focusgoal:')), false);
+    db.addFocusSession({ start: Date.now(), minutes: 70, date: today });
+    const reached = milestones(db, { today }).find((m) => m.key.startsWith('focusgoal:'));
+    equal(reached?.key, `focusgoal:${half.from}`);
+    equal(reached?.title, 'Weekly focus goal reached: 2 h');
   });
 
   it('counts applications sent this week against the goal', async () => {
